@@ -22271,13 +22271,18 @@ def settings():
             flash('Konfigurasi OAuth berhasil disimpan.', 'success')
         elif action == 'toggle_user':
             uid = int(request.form.get('user_id',0))
-            u = conn.execute("SELECT username, aktif FROM users WHERE id=?", (uid,)).fetchone()
-            conn.execute("UPDATE users SET aktif=CASE WHEN aktif=1 THEN 0 ELSE 1 END WHERE id=? AND username NOT IN ('admin', 'siadmin')", (uid,))
-            if u:
-                status_baru = 'dinonaktifkan' if u['aktif'] else 'diaktifkan'
-                add_log(conn, 'Toggle status user', f"Username: {u['username']} → {status_baru}", 'ADMIN')
-            conn.commit()
-            flash('Status user diperbarui.','info')
+            if uid == session.get('user_id'):
+                flash('Anda tidak dapat menonaktifkan akun Anda sendiri.', 'danger')
+            else:
+                u = conn.execute("SELECT username, aktif FROM users WHERE id=?", (uid,)).fetchone()
+                if u and u['username'] in ('admin', 'siadmin'):
+                    flash('Akun Super Admin tidak dapat dinonaktifkan.', 'danger')
+                elif u:
+                    conn.execute("UPDATE users SET aktif=CASE WHEN aktif=1 THEN 0 ELSE 1 END WHERE id=?", (uid,))
+                    status_baru = 'dinonaktifkan' if u['aktif'] else 'diaktifkan'
+                    add_log(conn, 'Toggle status user', f"Username: {u['username']} → {status_baru}", 'ADMIN')
+                    conn.commit()
+                    flash('Status user diperbarui.', 'info')
         elif action == 'reset_password':
             if DEMO_LOCK:
                 flash('Mode demo aktif: password tidak dapat diubah.', 'warning')
@@ -22293,25 +22298,35 @@ def settings():
                     flash('Password berhasil direset.','success')
         elif action == 'delete_user':
             uid = int(request.form.get('user_id',0))
-            u = conn.execute("SELECT username FROM users WHERE id=?", (uid,)).fetchone()
-            conn.execute("DELETE FROM users WHERE id=? AND username NOT IN ('admin', 'siadmin')", (uid,))
-            add_log(conn, 'Hapus user', f"Username: {u['username'] if u else uid}", 'ADMIN')
-            conn.commit()
-            flash('User dihapus.','warning')
+            if uid == session.get('user_id'):
+                flash('Anda tidak dapat menghapus akun Anda sendiri.', 'danger')
+            else:
+                u = conn.execute("SELECT username, role FROM users WHERE id=?", (uid,)).fetchone()
+                if u and u['username'] in ('admin', 'siadmin'):
+                    flash('Akun Super Admin tidak dapat dihapus.', 'danger')
+                elif u:
+                    conn.execute("DELETE FROM users WHERE id=?", (uid,))
+                    add_log(conn, 'Hapus user', f"Username: {u['username']} | Role: {u['role']}", 'ADMIN')
+                    conn.commit()
+                    flash(f'User {u["username"]} berhasil dihapus.', 'warning')
         elif action == 'change_role':
             uid      = int(request.form.get('user_id', 0))
             new_role = request.form.get('new_role', '').strip()
-            if new_role in ('ADMIN', 'FINANCE', 'MANAJER', 'INVESTOR', 'OPERATOR', 'KASIR') and uid:
+            if uid == session.get('user_id'):
+                flash('Anda tidak dapat mengubah role akun Anda sendiri.', 'danger')
+            elif new_role in ('ADMIN', 'FINANCE', 'MANAJER', 'INVESTOR', 'OPERATOR', 'KASIR') and uid:
                 u = conn.execute("SELECT username, role FROM users WHERE id=?", (uid,)).fetchone()
-                default_permissions = sorted(ROLE_DEFAULT_PERMISSIONS.get(new_role, set()))
-                conn.execute(
-                    "UPDATE users SET role=?, permissions=? WHERE id=? AND username NOT IN ('admin', 'siadmin')",
-                    (new_role, json.dumps(default_permissions), uid)
-                )
-                if u:
+                if u and u['username'] in ('admin', 'siadmin'):
+                    flash('Role Super Admin tidak dapat diubah.', 'danger')
+                elif u:
+                    default_permissions = sorted(ROLE_DEFAULT_PERMISSIONS.get(new_role, set()))
+                    conn.execute(
+                        "UPDATE users SET role=?, permissions=? WHERE id=?",
+                        (new_role, json.dumps(default_permissions), uid)
+                    )
                     add_log(conn, 'Ubah role user', f"Username: {u['username']} | {u['role']} → {new_role}", 'ADMIN')
-                conn.commit()
-                flash(f'Role berhasil diubah ke {new_role} dan hak akses diset ke default role.', 'success')
+                    conn.commit()
+                    flash(f'Role berhasil diubah ke {new_role} dan hak akses diset ke default role.', 'success')
         elif action == 'update_permissions':
             uid = int(request.form.get('user_id', 0))
             u = conn.execute("SELECT username, role FROM users WHERE id=?", (uid,)).fetchone()

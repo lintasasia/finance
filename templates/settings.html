@@ -849,46 +849,50 @@
                   <button type="button" class="btn btn-xs btn-outline-info" title="Edit Profil / Email"
                           onclick="editUser({{ u.id }}, '{{ u.username }}', '{{ (u.nama or '')|replace("'", "\\'") }}', '{{ (u.email or '')|replace("'", "\\'") }}')">
                     <i class="fas fa-user-pen"></i></button>
-                  {% if u.username not in ('admin', 'siadmin') and u.role != 'ADMIN' %}
-                  <!-- Change role dropdown -->
-                  <div class="dropdown">
-                    <button class="btn btn-xs btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown"
-                            title="Ubah Role" style="font-size:.65rem">
-                      <i class="fas fa-user-gear"></i></button>
-                    <ul class="dropdown-menu dropdown-menu-end" style="min-width:140px;font-size:.8rem">
-                      {% for r, lbl in [('ADMIN','Admin'),('FINANCE','Finance'),('MANAJER','Manajer POS'),('INVESTOR','Investor'),('OPERATOR','Operator'),('KASIR','Kasir Only')] %}
-                      <li>
-                        <form method="POST" style="margin:0">
-                          <input type="hidden" name="action" value="change_role">
-                          <input type="hidden" name="user_id" value="{{ u.id }}">
-                          <input type="hidden" name="new_role" value="{{ r }}">
-                          <button type="submit" class="dropdown-item {% if u.role==r %}fw-bold{% endif %}"
-                                  {% if u.role==r %}style="color:#15803d"{% endif %}>
-                            {% if u.role==r %}<i class="fas fa-check me-1"></i>{% endif %}{{ lbl }}</button>
-                        </form>
-                      </li>
-                      {% endfor %}
-                    </ul>
-                  </div>
-                  <form method="POST" style="display:inline">
-                    <input type="hidden" name="action" value="toggle_user">
-                    <input type="hidden" name="user_id" value="{{ u.id }}">
-                    <button class="btn btn-xs {% if u.aktif %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
-                            title="{% if u.aktif %}Nonaktifkan{% else %}Aktifkan{% endif %}">
-                      {% if u.aktif %}<i class="fas fa-ban"></i>{% else %}<i class="fas fa-check"></i>{% endif %}
-                    </button>
-                  </form>
-                  {% if not demo_lock %}
-                  <button class="btn btn-xs btn-outline-secondary" title="Reset Password"
-                          onclick="resetPw({{ u.id }}, '{{ u.username }}')">
-                    <i class="fas fa-key"></i></button>
-                  {% endif %}
-                  <form method="POST" style="display:inline"
-                        onsubmit="return confirm('Hapus user {{ u.username }}?')">
-                    <input type="hidden" name="action" value="delete_user">
-                    <input type="hidden" name="user_id" value="{{ u.id }}">
-                    <button class="btn btn-xs btn-outline-danger" title="Hapus"><i class="fas fa-trash"></i></button>
-                  </form>
+                  {% if u.username not in ('admin', 'siadmin') %}
+                    {% if u.id != session.get('user_id') %}
+                    <!-- Change role dropdown -->
+                    <div class="dropdown">
+                      <button class="btn btn-xs btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown"
+                              title="Ubah Role" style="font-size:.65rem">
+                        <i class="fas fa-user-gear"></i></button>
+                      <ul class="dropdown-menu dropdown-menu-end" style="min-width:140px;font-size:.8rem">
+                        {% for r, lbl in [('ADMIN','Admin'),('FINANCE','Finance'),('MANAJER','Manajer POS'),('INVESTOR','Investor'),('OPERATOR','Operator'),('KASIR','Kasir Only')] %}
+                        <li>
+                          <form method="POST" style="margin:0">
+                            <input type="hidden" name="action" value="change_role">
+                            <input type="hidden" name="user_id" value="{{ u.id }}">
+                            <input type="hidden" name="new_role" value="{{ r }}">
+                            <button type="submit" class="dropdown-item {% if u.role==r %}fw-bold{% endif %}"
+                                    {% if u.role==r %}style="color:#15803d"{% endif %}>
+                              {% if u.role==r %}<i class="fas fa-check me-1"></i>{% endif %}{{ lbl }}</button>
+                          </form>
+                        </li>
+                        {% endfor %}
+                      </ul>
+                    </div>
+                    <form method="POST" style="display:inline">
+                      <input type="hidden" name="action" value="toggle_user">
+                      <input type="hidden" name="user_id" value="{{ u.id }}">
+                      <button class="btn btn-xs {% if u.aktif %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+                              title="{% if u.aktif %}Nonaktifkan{% else %}Aktifkan{% endif %}">
+                        {% if u.aktif %}<i class="fas fa-ban"></i>{% else %}<i class="fas fa-check"></i>{% endif %}
+                      </button>
+                    </form>
+                    {% endif %}
+                    {% if not demo_lock %}
+                    <button class="btn btn-xs btn-outline-secondary" title="Reset Password"
+                            onclick="resetPw({{ u.id }}, '{{ u.username }}')">
+                      <i class="fas fa-key"></i></button>
+                    {% endif %}
+                    {% if u.id != session.get('user_id') %}
+                    <form method="POST" style="display:inline"
+                          onsubmit="return confirm('Hapus user {{ u.username }}{% if u.role == \'ADMIN\' %} (Admin){% endif %}?')">
+                      <input type="hidden" name="action" value="delete_user">
+                      <input type="hidden" name="user_id" value="{{ u.id }}">
+                      <button class="btn btn-xs btn-outline-danger" title="Hapus"><i class="fas fa-trash"></i></button>
+                    </form>
+                    {% endif %}
                   {% else %}
                   <span class="text-muted" style="font-size:.72rem">Super Admin</span>
                   {% endif %}
