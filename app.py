@@ -1455,11 +1455,6 @@ def init_db():
         ph = sha256('admin123'.encode()).hexdigest()
         conn.execute("INSERT INTO users(username,password_hash,nama,role) VALUES(?,?,?,?)",
                      ('admin', ph, 'Administrator', 'ADMIN'))
-    ph_demo = sha256('demo123'.encode()).hexdigest()
-    conn.execute(
-        "INSERT OR IGNORE INTO users(username,password_hash,nama,role) VALUES(?,?,?,?)",
-        ('demo', ph_demo, 'Demo User', 'DEMO')
-    )
 
     # Migrasi: selaraskan subtipe akun beban dengan pengelompokan calc_profitability
     conn.execute("UPDATE akun SET subtipe='Beban Penyusutan'  WHERE kode='6130' AND subtipe='Beban Operasional'")
@@ -2441,9 +2436,13 @@ def login():
 
 
 def _oauth_redirect_uri(provider='google'):
-    proto = request.headers.get('X-Forwarded-Proto') or request.scheme
     host = request.headers.get('X-Forwarded-Host') or request.host
-    if request.is_secure or request.headers.get('X-Forwarded-Proto') == 'https':
+    # Default to https for any public domain (Google strictly requires https)
+    is_local = host.startswith('localhost') or host.startswith('127.0.0.1')
+    proto = 'http' if is_local else 'https'
+    if request.headers.get('X-Forwarded-Proto'):
+        proto = request.headers.get('X-Forwarded-Proto').split(',')[0].strip()
+    elif request.is_secure:
         proto = 'https'
     path = request.path
     if path in ('/auth/google/callback', '/login/oauth/callback'):
