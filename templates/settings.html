@@ -887,7 +887,7 @@
                     {% endif %}
                     {% if u.id != session.get('user_id') %}
                     <form method="POST" style="display:inline"
-                          onsubmit="return confirm('Hapus user {{ u.username }}{% if u.role == \'ADMIN\' %} (Admin){% endif %}?')">
+                          onsubmit="return confirm('Hapus user {{ u.username }}{% if u.role == 'ADMIN' %} (Admin){% endif %}?')">
                       <input type="hidden" name="action" value="delete_user">
                       <input type="hidden" name="user_id" value="{{ u.id }}">
                       <button class="btn btn-xs btn-outline-danger" title="Hapus"><i class="fas fa-trash"></i></button>
