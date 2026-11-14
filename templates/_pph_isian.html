@@ -1,0 +1,121 @@
+{# Isian PPh lengkap: jenis & peruntukan PPh utama + rincian bukti potong. SEMUA isian opsional.
+   Dipakai di Penjualan, Pengeluaran, Pembelian, Pembelian PKP, Invoice, dan Edit Item.
+   Logika di static/pph_form.js. Field: pph_objek (jenis/peruntukan) dan {prefix}npwp, {prefix}nitku,
+   {prefix}kode_objek, {prefix}nomor_bukti, ... (lihat PPH_RINCI_KOLOM di app.py). #}
+
+{% macro skrip() -%}
+<datalist id="pph_kop_saran">
+  {%- for k, u in PPH_KOP_SARAN %}<option value="{{ k }}">{{ u }}</option>{% endfor -%}
+</datalist>
+<script>window.PPH_INFO = {{ pph_info_js()|tojson }};</script>
+<script src="{{ url_for('static', filename='pph_form.js', v='20261020b') }}"></script>
+{%- endmacro %}
+
+{% macro pilih_objek(idp, sisi, nilai='', tarif_id='', disabled=false) -%}
+<select name="pph_objek" id="{{ idp }}pph_objek" class="form-select form-select-sm pph-objek"
+        data-sisi="{{ sisi }}" data-idp="{{ idp }}" data-tarif="{{ tarif_id }}"
+        onchange="pphObjekBerubah(this)" aria-label="Jenis dan peruntukan PPh"{% if disabled %} disabled{% endif %}>
+  {%- for jenis, label, isi in pph_objek_pilihan(sisi, nilai) %}
+  <optgroup label="{{ label }}">
+    {%- for kode, uraian, tarif, kop in isi %}
+    <option value="{{ kode }}"{% if (nilai or PPH_OBJEK_BAWAAN) == kode %} selected{% endif %}>{{ label }} &middot; {{ uraian }}{% if tarif %} &middot; {{ ('%g'|format(tarif))|replace('.', ',') }}%{% endif %}</option>
+    {%- endfor %}
+  </optgroup>
+  {%- endfor %}
+</select>
+{%- endmacro %}
+
+{# Centang "disetor sendiri" untuk PPh final di penjualan (PPh 4 ayat (2)/PPh 15 selain UMKM). Hanya tampil
+   untuk peruntukan yang bisa disetor sendiri (pph_form.js). #}
+{% macro sendiri(idp, nilai=false, disabled=false, onchange='') -%}
+<div class="form-check mt-1" data-pph-sendiri-box="{{ idp }}" style="display:none">
+  <input class="form-check-input" type="checkbox" name="pph_sendiri" value="1" id="{{ idp }}pph_sendiri"
+         {% if nilai %}checked{% endif %}{% if disabled %} disabled{% endif %}
+         onchange="pphSegarkanLabel('{{ idp }}');{{ onchange }}">
+  <label class="form-check-label small" for="{{ idp }}pph_sendiri">Disetor sendiri, customer tidak memotong</label>
+  <div class="form-text mt-0" style="font-size:.68rem">Misalnya penyewa atau pemberi kerja orang pribadi. Tagihan
+    tidak dikurangi; PPh dicatat sebagai hutang yang Anda setor sendiri.</div>
+</div>
+{%- endmacro %}
+
+{% macro rincian(prefix, idp, nilai=none, judul='Rincian bukti potong', label_idp=none, label_awal='', disabled=false, buka=false, ringkas=false) -%}
+{%- set n = nilai or {} -%}
+{%- set ada = n.get('nomor_bukti') or n.get('npwp') or n.get('kode_objek') or n.get('fasilitas') -%}
+<details class="pph-rinci mt-2" data-prefix="{{ prefix }}"{% if buka or ada %} open{% endif %}>
+  <summary class="small fw-semibold" style="cursor:pointer;color:#92400e">
+    <i class="fas fa-file-signature me-1"></i>{{ judul }}{% if label_idp is not none %} <span data-pph-label="{{ label_idp }}">{{ label_awal }}</span>{% endif %}
+    <span class="fw-normal text-muted">(opsional, boleh dilengkapi belakangan)</span>
+  </summary>
+  <div class="row g-2 mt-1">
+    <div class="col-md-4">
+      <label class="form-label small mb-1" for="{{ idp }}{{ prefix }}npwp">NPWP / NIK lawan transaksi</label>
+      <input type="text" name="{{ prefix }}npwp" id="{{ idp }}{{ prefix }}npwp" class="form-control form-control-sm"
+             inputmode="numeric" maxlength="30" value="{{ n.get('npwp') or '' }}" placeholder="kosong = dari Database"{% if disabled %} disabled{% endif %}>
+    </div>
+    {% if not ringkas %}
+    <div class="col-md-4">
+      <label class="form-label small mb-1" for="{{ idp }}{{ prefix }}nitku">NITKU</label>
+      <input type="text" name="{{ prefix }}nitku" id="{{ idp }}{{ prefix }}nitku" class="form-control form-control-sm"
+             inputmode="numeric" maxlength="30" value="{{ n.get('nitku') or '' }}" placeholder="22 digit"{% if disabled %} disabled{% endif %}>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small mb-1" for="{{ idp }}{{ prefix }}nama">Nama sesuai NPWP</label>
+      <input type="text" name="{{ prefix }}nama" id="{{ idp }}{{ prefix }}nama" class="form-control form-control-sm"
+             maxlength="120" value="{{ n.get('nama') or '' }}" placeholder="kosong = nama customer/vendor"{% if disabled %} disabled{% endif %}>
+    </div>
+    {% endif %}
+    <div class="col-md-4">
+      <label class="form-label small mb-1" for="{{ idp }}{{ prefix }}kode_objek">Kode objek pajak</label>
+      <input type="text" name="{{ prefix }}kode_objek" id="{{ idp }}{{ prefix }}kode_objek" class="form-control form-control-sm"
+             list="pph_kop_saran" maxlength="20" value="{{ n.get('kode_objek') or '' }}" placeholder="mis. 24-104-01"{% if disabled %} disabled{% endif %}>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small mb-1" for="{{ idp }}{{ prefix }}nomor_bukti">Nomor bukti potong/pungut</label>
+      <input type="text" name="{{ prefix }}nomor_bukti" id="{{ idp }}{{ prefix }}nomor_bukti" class="form-control form-control-sm"
+             maxlength="60" value="{{ n.get('nomor_bukti') or '' }}"{% if disabled %} disabled{% endif %}>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small mb-1" for="{{ idp }}{{ prefix }}tanggal_bukti">Tanggal bukti</label>
+      <input type="date" name="{{ prefix }}tanggal_bukti" id="{{ idp }}{{ prefix }}tanggal_bukti" class="form-control form-control-sm"
+             value="{{ n.get('tanggal_bukti') or '' }}"{% if disabled %} disabled{% endif %}>
+    </div>
+    {% if not ringkas %}
+    <div class="col-md-4">
+      <label class="form-label small mb-1" for="{{ idp }}{{ prefix }}fasilitas">Fasilitas</label>
+      <select name="{{ prefix }}fasilitas" id="{{ idp }}{{ prefix }}fasilitas" class="form-select form-select-sm"{% if disabled %} disabled{% endif %}>
+        {% for k, lbl in PPH_FASILITAS %}<option value="{{ k }}"{% if (n.get('fasilitas') or '') == k %} selected{% endif %}>{{ lbl }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small mb-1" for="{{ idp }}{{ prefix }}no_fasilitas">No. SKB / Suket / SKD</label>
+      <input type="text" name="{{ prefix }}no_fasilitas" id="{{ idp }}{{ prefix }}no_fasilitas" class="form-control form-control-sm"
+             maxlength="60" value="{{ n.get('no_fasilitas') or '' }}"{% if disabled %} disabled{% endif %}>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small mb-1" for="{{ idp }}{{ prefix }}dok_jenis">Dokumen dasar</label>
+      <select name="{{ prefix }}dok_jenis" id="{{ idp }}{{ prefix }}dok_jenis" class="form-select form-select-sm"{% if disabled %} disabled{% endif %}>
+        {% for k, lbl in PPH_DOK_JENIS %}<option value="{{ k }}"{% if (n.get('dok_jenis') or '') == k %} selected{% endif %}>{{ lbl }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small mb-1" for="{{ idp }}{{ prefix }}dok_nomor">No. dokumen dasar</label>
+      <input type="text" name="{{ prefix }}dok_nomor" id="{{ idp }}{{ prefix }}dok_nomor" class="form-control form-control-sm"
+             maxlength="60" value="{{ n.get('dok_nomor') or '' }}"{% if disabled %} disabled{% endif %}>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small mb-1" for="{{ idp }}{{ prefix }}dok_tanggal">Tgl dokumen dasar</label>
+      <input type="date" name="{{ prefix }}dok_tanggal" id="{{ idp }}{{ prefix }}dok_tanggal" class="form-control form-control-sm"
+             value="{{ n.get('dok_tanggal') or '' }}"{% if disabled %} disabled{% endif %}>
+    </div>
+    <div class="col-md-8">
+      <label class="form-label small mb-1" for="{{ idp }}{{ prefix }}catatan">Catatan</label>
+      <input type="text" name="{{ prefix }}catatan" id="{{ idp }}{{ prefix }}catatan" class="form-control form-control-sm"
+             maxlength="300" value="{{ n.get('catatan') or '' }}"{% if disabled %} disabled{% endif %}>
+    </div>
+    {% endif %}
+  </div>
+  <div class="form-text" style="font-size:.7rem">
+    NPWP kosong diisi otomatis dari Database Customer/Vendor. Semua isian bisa diubah nanti lewat Pajak &gt; Rekap PPh.
+  </div>
+</details>
+{%- endmacro %}

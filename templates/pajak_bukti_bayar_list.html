@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block title %}Bukti Bayar Pajak{% endblock %}
+{% block content %}
+{% from '_pagination.html' import pagination with context %}
+{% set JENIS_SETOR = {'2111': 'PPN', '2112': 'PPh 23', '2117': 'PPh 4(2)', '2118': 'PPh 22', '2119': 'PPh 26', '2121': 'PPh 15', '2122': 'PPh Final UMKM', '2123': 'PPh 21', '2110': 'PPh Badan', '2115': 'PPh 21', '2116': 'BPJS', '2120': 'Gaji'} %}
+<div class="d-flex align-items-center gap-2 mb-3">
+  <a href="/pajak" class="btn btn-sm btn-outline-secondary"><i class="fas fa-arrow-left"></i></a>
+  <h4 class="mb-0"><i class="fas fa-receipt text-success me-2"></i>Bukti Bayar Pajak
+    <span class="badge bg-warning text-dark ms-1" style="font-size:.65rem"><i class="fas fa-puzzle-piece me-1"></i>Lanjutan</span>
+  </h4>
+</div>
+
+<div class="alert alert-info py-2 small mb-3">
+  <i class="fas fa-circle-info me-1"></i>
+  Daftar transaksi <strong>Setor Pajak</strong> yang telah dicatat. Cetak sebagai dokumen internal
+  pengganti BPN (Bukti Penerimaan Negara) untuk arsip pembukuan Anda.
+</div>
+
+{% if rows %}
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0 align-middle small">
+      <thead class="table-light">
+        <tr>
+          <th>Tanggal</th>
+          <th>Keterangan</th>
+          <th>Jenis Pajak</th>
+          <th class="text-end">Nominal Disetor</th>
+          <th class="text-center">Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td class="text-nowrap">{{ r.tanggal|tgl }}</td>
+          <td>{{ r.keterangan }}</td>
+          <td>
+            {% set jl = JENIS_SETOR.get(r.akun_kode) %}
+            <span class="badge {{ 'bg-primary' if r.akun_kode == '2111' else ('bg-danger' if jl and jl.startswith('PPh') else 'bg-secondary') }}">{{ jl or 'Pajak' }}</span>
+            <span class="text-muted ms-1">{{ r.akun_nama }}</span>
+          </td>
+          <td class="text-end fw-semibold text-success">{{ r.nominal|rp }}</td>
+          <td class="text-center">
+            <a href="/pajak/bukti-bayar/{{ r.id }}/cetak" target="_blank"
+               class="btn btn-sm btn-outline-success">
+              <i class="fas fa-print me-1"></i>Cetak BB
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="text-center text-muted py-5">
+  <i class="fas fa-receipt fa-3x mb-3 opacity-25"></i>
+  <p class="mb-1">Belum ada transaksi setor pajak yang tercatat.</p>
+  <p class="small">Gunakan <a href="/pajak/setor">Setor Pajak</a> untuk mencatat pembayaran pajak ke DJP.</p>
+</div>
+{% endif %}
+{{ pagination(pg) }}
+{% endblock %}

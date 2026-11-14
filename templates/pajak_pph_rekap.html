@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+{% block title %}Rekap PPh {{ bulan_nama }} {{ tahun }} - FinansialApp{% endblock %}
+{% block page_title %}<i class="fas fa-table-list text-primary me-2"></i>Rekap PPh Bulanan{% endblock %}
+{% block content %}
+{% set NAMA_BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'] %}
+{% set prev_b = 12 if bulan == 1 else bulan - 1 %}{% set prev_t = tahun - 1 if bulan == 1 else tahun %}
+{% set next_b = 1 if bulan == 12 else bulan + 1 %}{% set next_t = tahun + 1 if bulan == 12 else tahun %}
+
+{% macro tabel_detail(baris, sisi) %}
+<div class="table-responsive">
+  <table class="table table-sm mb-0 align-middle" style="font-size:.82rem">
+    <thead class="table-light"><tr>
+      <th class="ps-3">Tanggal</th>
+      <th>Transaksi</th>
+      <th>{{ 'Dipotong dari' if sisi == 'BELI' else ('Customer' if sisi == 'SENDIRI' else 'Pemotong') }}</th>
+      <th>Jenis &amp; Peruntukan</th>
+      <th class="text-end">DPP</th>
+      <th class="text-end">Tarif</th>
+      <th class="text-end">PPh</th>
+      <th>No. Bukti</th>
+      <th class="pe-3"><span class="visually-hidden">Aksi</span></th>
+    </tr></thead>
+    <tbody>
+      {% for e in baris %}
+      <tr>
+        <td class="ps-3 text-nowrap">{{ e.tanggal|tgl }}</td>
+        <td>
+          <a href="/transaksi/{{ e.jurnal_id }}">{{ e.nomor_tx or ('#' ~ e.jurnal_id) }}</a>
+          {% if e.retur %}<span class="badge bg-warning text-dark">Retur</span>{% endif %}
+          <div class="text-muted small text-truncate" style="max-width:15rem">{{ e.keterangan }}</div>
+        </td>
+        <td>
+          {{ e.nama or e.pihak or '-' }}
+          <div class="small {{ 'text-muted' if e.npwp else 'text-warning' }}">{{ ('NPWP ' ~ e.npwp) if e.npwp else 'NPWP belum diisi' }}</div>
+        </td>
+        <td>
+          <span class="fw-semibold">{{ e.label }}</span>{% if e.final %} <span class="badge bg-secondary">final</span>{% endif %}
+          <div class="text-muted small">{{ e.uraian }}{% if e.kode_objek %} &middot; {{ e.kode_objek }}{% endif %}</div>
+        </td>
+        <td class="text-end text-nowrap">{{ e.dpp|rp if e.dpp is not none else '-' }}</td>
+        <td class="text-end text-nowrap">{{ (e.tarif|qty ~ '%') if e.tarif else '-' }}</td>
+        <td class="text-end fw-semibold text-nowrap">{{ e.pph|rp }}</td>
+        <td class="text-nowrap">{% if e.nomor_bukti %}{{ e.nomor_bukti }}{% else %}<span class="text-muted">belum dicatat</span>{% endif %}</td>
+        <td class="pe-3 text-nowrap">
+          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('pajak_pph_rincian', jurnal_id=e.jurnal_id, slot=e.slot, next=request.full_path) }}">
+            <i class="fas fa-pen-to-square me-1"></i>Rincian</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endmacro %}
+
+{% macro tabel_ringkas(ringkas, sisi) %}
+<table class="table table-sm mb-0" style="font-size:.84rem">
+  <thead class="table-light"><tr>
+    <th class="ps-3">Jenis PPh</th><th class="text-end">Transaksi</th><th class="text-end">DPP</th><th class="text-end pe-3">PPh</th>
+  </tr></thead>
+  <tbody>
+    {% for x in ringkas %}
+    <tr>
+      <td class="ps-3">{{ x.label }}
+        {% if sisi == 'JUAL' %}<span class="badge {{ 'bg-secondary' if x.final else 'bg-info' }}">{{ 'final, jadi beban' if x.final else 'kredit pajak' }}</span>{% endif %}</td>
+      <td class="text-end">{{ x.n }}</td>
+      <td class="text-end text-nowrap">{{ x.dpp|rp }}</td>
+      <td class="text-end pe-3 fw-semibold text-nowrap">{{ x.pph|rp }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot><tr class="fw-bold">
+    <td class="ps-3">Jumlah</td>
+    <td class="text-end">{{ ringkas|sum(attribute='n') }}</td>
+    <td class="text-end text-nowrap">{{ ringkas|sum(attribute='dpp')|rp }}</td>
+    <td class="text-end pe-3 text-nowrap">{{ ringkas|sum(attribute='pph')|rp }}</td>
+  </tr></tfoot>
+</table>
+{% endmacro %}
+
+<div class="d-flex flex-wrap align-items-end gap-2 mb-2">
+  <a href="/pajak" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Hub Pajak</a>
+  <div class="btn-group btn-group-sm" role="group" aria-label="Pindah bulan">
+    <a class="btn btn-outline-secondary" href="{{ url_for('pajak_pph_rekap', tahun=prev_t, bulan=prev_b) }}" aria-label="Bulan sebelumnya"><i class="fas fa-chevron-left"></i></a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('pajak_pph_rekap', tahun=next_t, bulan=next_b) }}" aria-label="Bulan berikutnya"><i class="fas fa-chevron-right"></i></a>
+  </div>
+  <form method="GET" class="d-flex flex-wrap align-items-end gap-2">
+    <select name="bulan" class="form-select form-select-sm" style="width:auto" aria-label="Bulan">
+      {% for b in range(1, 13) %}<option value="{{ b }}" {% if b == bulan %}selected{% endif %}>{{ NAMA_BULAN[b - 1] }}</option>{% endfor %}
+    </select>
+    <select name="tahun" class="form-select form-select-sm" style="width:auto" aria-label="Tahun">
+      {% for t in range([tahun, today.year]|min - 3, [tahun, today.year]|max + 2) %}<option value="{{ t }}" {% if t == tahun %}selected{% endif %}>{{ t }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-sm btn-primary" type="submit">Tampilkan</button>
+  </form>
+  <a href="{{ url_for('pajak_pph_export', tahun=tahun, bulan=bulan) }}" class="btn btn-sm btn-outline-success ms-auto">
+    <i class="fas fa-file-excel me-1"></i>Export Excel</a>
+</div>
+<div class="small text-muted mb-3">
+  Periode {{ sd|tgl }} s.d. {{ ed|tgl }}. Pemotong: <strong>{{ ident.nama }}</strong>,
+  NPWP {{ ident.npwp or 'belum diisi' }} (<a href="{{ url_for('pajak_pengaturan') }}">ubah identitas pajak</a>).
+</div>
+
+{% set total_potong = potong|sum(attribute='pph') %}
+{% set total_dipotong = dipotong|sum(attribute='pph') %}
+{% set total_akhir = posisi|sum(attribute='akhir') %}
+<div class="row g-2 mb-3">
+  <div class="col-md-4">
+    <div class="card kpi red">
+      <div class="kpi-lbl">PPh yang Anda potong/pungut</div>
+      <div class="kpi-val text-rp">{{ total_potong|rp }}</div>
+      <div class="kpi-sub">{{ potong|length }} transaksi, disetor dan dilaporkan sendiri</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card kpi blu">
+      <div class="kpi-lbl">PPh dipotong pihak lain</div>
+      <div class="kpi-val text-rp">{{ total_dipotong|rp }}</div>
+      <div class="kpi-sub">{{ dipotong|length }} transaksi penjualan</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card kpi {{ 'red' if total_akhir > 0.5 else 'sla' }}">
+      <div class="kpi-lbl">Hutang PPh akhir {{ bulan_nama }}</div>
+      <div class="kpi-val text-rp">{{ total_akhir|rp }}</div>
+      <div class="kpi-sub">{% if total_akhir > 0.5 %}<a href="/pajak/setor">Setor sekarang</a>{% else %}Tidak ada yang belum disetor{% endif %}</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── A. PPh yang kita potong ── -->
+<div class="card mb-3">
+  <div class="card-header py-2 d-flex flex-wrap align-items-center gap-2">
+    <span class="fw-semibold" style="font-size:.88rem"><i class="fas fa-scissors me-2 text-danger"></i>PPh yang Anda potong/pungut</span>
+    {% set tanpa_bukti = potong|rejectattr('nomor_bukti')|list|length %}
+    {% if potong and tanpa_bukti %}<span class="badge bg-warning text-dark">{{ tanpa_bukti }} belum ada nomor bukti potong</span>{% endif %}
+  </div>
+  {% if potong %}
+  <div class="card-body p-0">
+    {{ tabel_ringkas(ringkas_potong, 'BELI') }}
+    <div class="border-top">{{ tabel_detail(potong, 'BELI') }}</div>
+  </div>
+  <div class="card-footer small text-muted">
+    Umumnya disetor paling lambat tanggal 15 dan dilaporkan paling lambat tanggal 20 bulan berikutnya
+    (SPT Masa PPh Unifikasi untuk PPh 4 ayat (2), 15, 22, 23, dan 26; SPT Masa PPh 21/26 untuk PPh 21).
+  </div>
+  {% else %}
+  <div class="card-body text-muted small">Tidak ada PPh yang Anda potong di {{ bulan_nama }} {{ tahun }}.</div>
+  {% endif %}
+</div>
+
+<!-- ── B. Posisi hutang PPh ── -->
+<div class="card mb-3">
+  <div class="card-header py-2 fw-semibold" style="font-size:.88rem">
+    <i class="fas fa-scale-balanced me-2 text-primary"></i>Posisi Hutang PPh {{ bulan_nama }} {{ tahun }}
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm mb-0" style="font-size:.84rem">
+        <thead class="table-light"><tr>
+          <th class="ps-3">Akun</th><th class="text-end">Saldo Awal</th><th class="text-end">Bertambah</th>
+          <th class="text-end">Disetor</th><th class="text-end">Berkurang Lain</th><th class="text-end pe-3">Saldo Akhir</th>
+        </tr></thead>
+        <tbody>
+          {% for p in posisi %}
+          <tr>
+            <td class="ps-3"><span class="fw-semibold">{{ p.kode }}</span> {{ p.nama }}</td>
+            <td class="text-end text-nowrap">{{ p.awal|rp }}</td>
+            <td class="text-end text-nowrap">{{ p.tambah|rp }}</td>
+            <td class="text-end text-nowrap">{{ p.setor|rp }}</td>
+            <td class="text-end text-nowrap">{{ p.kurang_lain|rp }}</td>
+            <td class="text-end pe-3 fw-bold text-nowrap {{ 'text-danger' if p.akhir > 0.5 else '' }}">{{ p.akhir|rp }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="ps-3 text-muted">Tidak ada hutang PPh di periode ini.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card-footer small text-muted">
+    "Berkurang lain" berasal dari retur atau jurnal koreksi.
+    {% if pph21_gaji > 0 %}PPh 21 karyawan dari Gaji bulan ini {{ pph21_gaji|rp }} (akun 2115), dilaporkan di SPT Masa PPh 21/26.{% endif %}
+  </div>
+</div>
+
+<!-- ── C. PPh dipotong pihak lain ── -->
+<div class="card mb-3">
+  <div class="card-header py-2 fw-semibold" style="font-size:.88rem">
+    <i class="fas fa-file-contract me-2 text-info"></i>PPh yang dipotong pihak lain (dari penjualan Anda)
+  </div>
+  {% if dipotong %}
+  <div class="card-body p-0">
+    {{ tabel_ringkas(ringkas_dipotong, 'JUAL') }}
+    <div class="border-top">{{ tabel_detail(dipotong, 'JUAL') }}</div>
+  </div>
+  <div class="card-footer small text-muted">
+    Kredit pajak dikreditkan di SPT Tahunan. Mintalah bukti potong dari pemotong lalu catat nomornya lewat Rincian.
+  </div>
+  {% else %}
+  <div class="card-body text-muted small">Tidak ada PPh yang dipotong pihak lain di {{ bulan_nama }} {{ tahun }}.</div>
+  {% endif %}
+</div>
+
+{% if sendiri %}
+<!-- ── C2. PPh final yang disetor sendiri ── -->
+<div class="card mb-3">
+  <div class="card-header py-2 fw-semibold" style="font-size:.88rem">
+    <i class="fas fa-building-columns me-2 text-success"></i>PPh final yang Anda setor sendiri (dari penjualan Anda)
+  </div>
+  <div class="card-body p-0">
+    {{ tabel_ringkas(ringkas_sendiri, 'SENDIRI') }}
+    <div class="border-top">{{ tabel_detail(sendiri, 'SENDIRI') }}</div>
+  </div>
+  <div class="card-footer small text-muted">
+    Customer tidak memotong, jadi PPh final ini Anda setor sendiri (umumnya paling lambat tanggal 15 bulan berikutnya)
+    dan laporkan di SPT Masa PPh Unifikasi. Hutangnya ikut di Posisi Hutang PPh. Nomor bukti boleh diisi NTPN setoran.
+  </div>
+</div>
+{% endif %}
+
+{% if umkm %}
+<!-- ── D. PPh final UMKM ── -->
+<div class="card mb-3">
+  <div class="card-header py-2 d-flex align-items-center gap-2">
+    <span class="fw-semibold" style="font-size:.88rem"><i class="fas fa-store me-2 text-success"></i>PPh Final UMKM {{ bulan_nama }} {{ tahun }}</span>
+    <a href="{{ url_for('pajak_pph_umkm', tahun=tahun) }}" class="btn btn-sm btn-outline-success ms-auto">Buka PPh Final UMKM</a>
+  </div>
+  <div class="card-body py-2">
+    <div class="row g-2 text-center" style="font-size:.84rem">
+      <div class="col-6 col-md-3"><div class="text-muted small">Omzet bruto</div><div class="fw-semibold">{{ umkm.omzet|rp }}</div></div>
+      <div class="col-6 col-md-3"><div class="text-muted small">Dasar setor sendiri</div><div class="fw-semibold">{{ umkm.dasar|rp }}</div></div>
+      <div class="col-6 col-md-3"><div class="text-muted small">PPh final ({{ umkm_setelan.tarif|qty }}%)</div><div class="fw-bold">{{ umkm.pph|rp }}</div></div>
+      <div class="col-6 col-md-3"><div class="text-muted small">Status</div>
+        <div class="fw-semibold">{% if umkm.tercatat %}Sudah dicatat{% elif umkm.mendatang %}Belum berjalan{% elif umkm.pph > 0 %}<span class="text-danger">Belum dicatat</span>{% else %}Tidak terutang{% endif %}</div></div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

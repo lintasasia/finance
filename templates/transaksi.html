@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% from '_pagination.html' import pagination with context %}
+{% block title %}Transaksi - FinansialApp{% endblock %}
+{% block page_title %}Jurnal Transaksi{% endblock %}
+{% block content %}
+<style>
+.drp2-panel{position:fixed;z-index:9999;background:var(--card);border:1px solid var(--bdr-md);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.18);display:flex;overflow-x:hidden;overflow-y:auto;max-height:calc(100vh - 16px);width:700px;max-width:calc(100vw - 16px)}
+.drp2-sidebar{width:175px;flex-shrink:0;border-right:1px solid var(--bdr-md);overflow-y:auto;padding:.6rem 0;background:var(--card)}
+.drp2-stitle{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--tx3);padding:.25rem .85rem .5rem}
+.drp2-preset{padding:.38rem .85rem;font-size:.82rem;cursor:pointer;color:var(--tx2);border-left:2.5px solid transparent;white-space:nowrap}
+.drp2-preset:hover{background:var(--bdr);color:var(--tx)}
+.drp2-preset.drp2-active{background:#f0fdf4;color:#15803d;border-left-color:#16a34a;font-weight:600}
+[data-theme=dark] .drp2-preset.drp2-active{background:rgba(20,83,45,.4);color:#4ade80}
+.drp2-right{flex:1;display:flex;flex-direction:column;min-width:0}.drp2-cals{display:flex;gap:1.25rem;padding:1rem 1rem .75rem}.drp2-month{flex:1}
+.drp2-mhdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem}.drp2-mnav{background:none;border:none;cursor:pointer;color:var(--tx2);font-size:1.15rem;line-height:1;padding:2px 8px;border-radius:5px}.drp2-mnav:hover{background:var(--bdr)}
+.drp2-mtitle{font-size:.85rem;font-weight:700;color:var(--tx)}.drp2-daynames,.drp2-grid{display:grid;grid-template-columns:repeat(7,1fr)}.drp2-daynames{margin-bottom:.25rem}.drp2-daynames div{text-align:center;font-size:.6rem;font-weight:600;color:var(--tx3);padding:.18rem 0}
+.drp2-day,.drp2-empty{text-align:center;font-size:.78rem;padding:.3rem .1rem;cursor:pointer;border-radius:5px;color:var(--tx);border:1.5px solid transparent;line-height:1.4;user-select:none}.drp2-empty{cursor:default}.drp2-day:hover{background:var(--bdr)}.drp2-today{font-weight:700;border-color:#16a34a!important;color:#15803d}.drp2-sel-s,.drp2-sel-e{background:#15803d!important;color:#fff!important;border-color:#16a34a!important;font-weight:700}.drp2-in-range{background:#dcfce7;color:#15803d;border-radius:0}.drp2-hover-range{background:#f0fdf4;color:#166534;border-radius:0}[data-theme=dark] .drp2-in-range{background:rgba(20,83,45,.5);color:#86efac}[data-theme=dark] .drp2-hover-range{background:rgba(20,83,45,.25);color:#86efac}
+.drp2-foot{padding:.65rem 1rem;border-top:1px solid var(--bdr-md);display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}.drp2-inp{background:var(--inp);color:var(--tx);border:1px solid var(--bdr-md);border-radius:6px;padding:.3rem .65rem;font-size:.8rem;width:112px}.drp2-sep{color:var(--tx3)}
+@media(max-width:768px){.drp2-panel{width:calc(100vw - 16px);flex-direction:column}.drp2-sidebar{width:100%;border-right:none;border-bottom:1px solid var(--bdr-md);max-height:100px;display:flex;flex-wrap:wrap;padding:.35rem .5rem}.drp2-stitle{display:none}.drp2-preset{padding:.25rem .5rem;font-size:.75rem;border-left:none;border:1px solid var(--bdr-md);border-radius:4px;margin:.15rem}.drp2-cals{flex-direction:column;gap:.5rem;padding:.5rem}}
+</style>
+
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  <a href="/transaksi/baru" class="btn btn-primary">
+    <i class="fas fa-plus me-1"></i>Transaksi Baru
+  </a>
+  {% if session.role in ('ADMIN','FINANCE') %}
+  <a href="/transaksi/arsip" class="btn btn-outline-secondary">
+    <i class="fas fa-box-archive me-1"></i>Arsip
+  </a>
+  {% endif %}
+  <form class="d-flex gap-2 flex-grow-1 flex-wrap" method="get" id="jrFilterForm">
+    <input type="hidden" name="date_from" id="jrDateFrom" value="{{ date_from or '' }}">
+    <input type="hidden" name="date_to" id="jrDateTo" value="{{ date_to or '' }}">
+    {# Rentang tanggal: picker yang sama dengan dashboard & Daftar Transaksi #}
+    <button type="button" id="jrDrpBtn" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2"
+            style="font-size:.82rem;min-width:220px;justify-content:flex-start">
+      <i class="fas fa-calendar-days" style="color:#15803d;font-size:.85rem"></i>
+      <span id="jrDrpLbl" style="flex:1;text-align:left">Semua Tanggal</span>
+      <i class="fas fa-chevron-down" style="font-size:.65rem;opacity:.45"></i>
+    </button>
+    <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" style="flex:1 1 200px" placeholder="Cari ID / keterangan / referensi...">
+    <select name="kat" class="form-select form-select-sm" style="min-width:150px">
+      <option value="">Semua Kategori</option>
+      <option value="OPERASIONAL" {% if kat=='OPERASIONAL' %}selected{% endif %}>Operasional</option>
+      <option value="INVESTASI" {% if kat=='INVESTASI' %}selected{% endif %}>Investasi</option>
+      <option value="PENDANAAN" {% if kat=='PENDANAAN' %}selected{% endif %}>Pendanaan</option>
+    </select>
+    <select name="tipe_tx" class="form-select form-select-sm" style="min-width:170px" title="Jenis transaksi">
+      <option value="">Semua Jenis</option>
+      {% for k, v in (label_tipe_tx or {}).items() %}
+      <option value="{{ k }}" {% if tipe_tx == k %}selected{% endif %}>{{ v }}</option>
+      {% endfor %}
+      {% if tipe_tx and tipe_tx not in (label_tipe_tx or {}) %}<option value="{{ tipe_tx }}" selected>{{ tipe_tx }}</option>{% endif %}
+    </select>
+    <button class="btn btn-outline-secondary btn-sm"><i class="fas fa-search"></i></button>
+    {% if date_from or date_to %}
+    <a href="{{ url_for('transaksi_list', q=q or None, kat=kat or None, tipe_tx=tipe_tx or None) }}"
+       class="btn btn-sm btn-link text-muted text-decoration-none px-1 align-self-center" title="Tampilkan semua tanggal">
+      <i class="fas fa-xmark me-1"></i>Hapus filter tanggal</a>
+    {% endif %}
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-sm mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3" style="width:145px">ID Transaksi</th>
+            <th style="width:110px">Tanggal</th>
+            <th>Keterangan</th>
+            <th>Referensi</th>
+            <th>Kategori</th>
+            <th class="text-end">Jumlah (Debit)</th>
+            <th style="width:80px"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr>
+            <td class="ps-3 text-muted text-nowrap">{{ r.nomor_tx }}</td>
+            <td class="text-muted">{{ r.tanggal|tgl }}</td>
+            <td>
+              <a href="/transaksi/{{ r.id }}" class="text-decoration-none text-dark fw-semibold">{{ r.keterangan }}</a>
+              {% if r.pos_nomor %}
+                <span class="badge bg-dark text-white ms-1" style="font-size:.62rem;font-weight:600" title="Transaksi dari POS Kasir">
+                  <i class="fas fa-cash-register me-1"></i>POS
+                </span>
+                {% if r.pos_kasir %}
+                <span class="text-muted ms-1" style="font-size:.72rem" title="Kasir yang menginput">
+                  <i class="fas fa-user me-1"></i>{{ r.pos_kasir }}
+                </span>
+                {% endif %}
+              {% endif %}
+            </td>
+            <td><small class="text-muted">{{ r.referensi or '-' }}</small></td>
+            <td>
+              {% if r.kategori == 'OPERASIONAL' %}<span class="badge badge-op">Operasional</span>
+              {% elif r.kategori == 'INVESTASI' %}<span class="badge badge-inv">Investasi</span>
+              {% elif r.kategori == 'PENDANAAN' %}<span class="badge badge-fin">Pendanaan</span>
+              {% elif r.kategori == 'KOREKSI' %}<span class="badge bg-warning text-dark">Koreksi</span>
+              {% else %}<span class="badge bg-secondary">{{ r.kategori or '-' }}</span>{% endif %}
+            </td>
+            <td class="text-end text-rp fw-semibold">{{ r.total|rp }}</td>
+            <td class="text-end pe-3">
+              <div class="d-flex gap-1 justify-content-end">
+                <a href="/transaksi/{{ r.id }}" class="btn btn-outline-secondary btn-xs" title="Detail">
+                  <i class="fas fa-eye"></i>
+                </a>
+                {% if session.role in ('ADMIN','FINANCE') %}
+                <a href="/transaksi/{{ r.id }}/edit" class="btn btn-outline-warning btn-xs" title="Edit">
+                  <i class="fas fa-pen-to-square"></i>
+                </a>
+                {% endif %}
+                {% if session.role in ('ADMIN','FINANCE') %}
+                <a href="/transaksi/{{ r.id }}/hapus" class="btn btn-outline-danger btn-xs" title="Hapus (konfirmasi dulu)">
+                  <i class="fas fa-trash"></i>
+                </a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-center text-muted py-5">
+            <i class="fas fa-inbox fa-2x mb-2 d-block"></i>Belum ada transaksi
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{{ pagination(pg) }}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  const BLN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const HRN=['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+  let start=null,end=null,hover=null,selecting=false,leftYear,leftMonth,panel=null;
+  const z=n=>String(n).padStart(2,'0');
+  const ymd=d=>d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());
+  const fromYMD=s=>{if(!s)return null;const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);};
+  const disp=d=>d?d.getDate()+' '+BLN[d.getMonth()].slice(0,3)+' '+d.getFullYear():'';
+  function presets(){
+    const t=new Date();t.setHours(0,0,0,0);
+    const ago=n=>{const d=new Date(t);d.setDate(d.getDate()-n);return d;};
+    const som=d=>new Date(d.getFullYear(),d.getMonth(),1);
+    const eom=d=>new Date(d.getFullYear(),d.getMonth()+1,0);
+    const sow=d=>{const r=new Date(d),w=r.getDay();r.setDate(r.getDate()-(w===0?6:w-1));return r;};
+    const lms=new Date(t.getFullYear(),t.getMonth()-1,1),lw=sow(ago(7)),lwe=new Date(lw);lwe.setDate(lwe.getDate()+6);
+    return [
+      ['Hari Ini',t,t],['Kemarin',ago(1),ago(1)],['7 Hari Terakhir',ago(6),t],
+      ['14 Hari Terakhir',ago(13),t],['30 Hari Terakhir',ago(29),t],
+      ['Minggu Ini',sow(t),t],['Minggu Lalu',lw,lwe],['Bulan Ini',som(t),t],
+      ['Bulan Lalu',lms,eom(lms)],['Tahun Ini',new Date(t.getFullYear(),0,1),t]
+    ].map(x=>({label:x[0],start:x[1],end:x[2]}));
+  }
+  const PS=presets();
+  const cells=(y,m)=>{const a=[];for(let i=0;i<new Date(y,m,1).getDay();i++)a.push(null);for(let d=1;d<=new Date(y,m+1,0).getDate();d++)a.push(new Date(y,m,d));return a;};
+  function dayClass(d){
+    const today=new Date();today.setHours(0,0,0,0);let c='drp2-day';
+    if(+d===+today)c+=' drp2-today';
+    if(start&&ymd(d)===ymd(start))c+=' drp2-sel-s';
+    if(end&&ymd(d)===ymd(end))c+=' drp2-sel-e';
+    if(start&&end&&d>start&&d<end)c+=' drp2-in-range';
+    if(selecting&&start&&!end&&hover){
+      const lo=start<hover?start:hover,hi=start<hover?hover:start;
+      if(d>=lo&&d<=hi)c+=ymd(d)===ymd(hover)?' drp2-sel-e':' drp2-hover-range';
+    }
+    return c;
+  }
+  function month(y,m,left){
+    const min=new Date().getFullYear()-30,max=new Date().getFullYear()+10;
+    let years='';for(let n=min;n<=max;n++)years+=`<option${n===y?' selected':''}>${n}</option>`;
+    return `<div class="drp2-month"><div class="drp2-mhdr">
+      ${left?'<button type="button" class="drp2-mnav" id="jrDrpPrev">&#8249;</button>':'<span></span>'}
+      <div class="drp2-mtitle">${BLN[m]} <select class="drp2-yr-sel" id="${left?'jrDrpYrL':'jrDrpYrR'}">${years}</select></div>
+      ${left?'<button type="button" class="drp2-mnav" id="jrDrpNext">&#8250;</button>':'<span></span>'}
+      </div><div class="drp2-daynames">${HRN.map(x=>`<div>${x}</div>`).join('')}</div>
+      <div class="drp2-grid">${cells(y,m).map(d=>d?`<div class="${dayClass(d)}" data-dt="${ymd(d)}">${d.getDate()}</div>`:'<div class="drp2-empty"></div>').join('')}</div></div>`;
+  }
+  function render(){
+    const rm=leftMonth===11?0:leftMonth+1,ry=leftMonth===11?leftYear+1:leftYear;
+    const active=PS.findIndex(p=>start&&end&&ymd(p.start)===ymd(start)&&ymd(p.end)===ymd(end));
+    return `<div class="drp2-sidebar"><div class="drp2-stitle">Pilih Cepat</div>
+      ${PS.map((p,i)=>`<div class="drp2-preset${i===active?' drp2-active':''}" data-preset="${i}">${p.label}</div>`).join('')}</div>
+      <div class="drp2-right"><div class="drp2-cals">${month(leftYear,leftMonth,true)}${month(ry,rm,false)}</div>
+      <div class="drp2-foot"><div class="d-flex align-items-center gap-2">
+      <input class="drp2-inp" value="${disp(start)}" readonly><span class="drp2-sep">→</span>
+      <input class="drp2-inp" value="${disp(end)}" readonly></div><div class="ms-auto d-flex gap-2">
+      <button type="button" id="jrDrpCancel" class="btn btn-sm btn-outline-secondary">Batal</button>
+      <button type="button" id="jrDrpUpdate" class="btn btn-sm btn-success"${start&&end?'':' disabled'}>Update</button></div></div></div>`;
+  }
+  function trigger(){document.getElementById('jrDrpLbl').textContent=start&&end?disp(start)+', '+disp(end):'Semua Tanggal';}
+  function refresh(){if(panel){panel.innerHTML=render();bind();}}
+  // Repaint kelas hari IN-PLACE saat hover (JANGAN rebuild innerHTML — itu menghancurkan
+  // elemen hari di tengah klik → klik tanggal kedua tak ter-fire → rentang gagal di-update).
+  function paintDays(){if(panel)panel.querySelectorAll('[data-dt]').forEach(el=>el.className=dayClass(fromYMD(el.dataset.dt)));}
+  function bind(){
+    panel.querySelectorAll('[data-preset]').forEach(el=>el.onclick=()=>{const p=PS[+el.dataset.preset];start=new Date(p.start);end=new Date(p.end);selecting=false;leftYear=start.getFullYear();leftMonth=start.getMonth();trigger();refresh();});
+    panel.querySelectorAll('[data-dt]').forEach(el=>{
+      el.onclick=()=>{const d=fromYMD(el.dataset.dt);if(!selecting){start=d;end=null;selecting=true;}else{if(d<start){end=start;start=d;}else end=d;selecting=false;}trigger();refresh();};
+      el.onmouseenter=()=>{if(selecting){hover=fromYMD(el.dataset.dt);paintDays();}};
+    });
+    panel.querySelector('#jrDrpPrev').onclick=()=>{if(--leftMonth<0){leftMonth=11;leftYear--;}refresh();};
+    panel.querySelector('#jrDrpNext').onclick=()=>{if(++leftMonth>11){leftMonth=0;leftYear++;}refresh();};
+    panel.querySelector('#jrDrpYrL').onchange=e=>{leftYear=+e.target.value;refresh();};
+    panel.querySelector('#jrDrpYrR').onchange=e=>{leftYear=+e.target.value-(leftMonth===11?1:0);refresh();};
+    panel.querySelector('#jrDrpCancel').onclick=close;
+    panel.querySelector('#jrDrpUpdate').onclick=()=>{if(start&&end){document.getElementById('jrDateFrom').value=ymd(start);document.getElementById('jrDateTo').value=ymd(end);close();document.getElementById('jrFilterForm').submit();}};
+  }
+  function close(){if(panel){panel.remove();panel=null;}document.removeEventListener('mousedown',outside);selecting=false;hover=null;}
+  function outside(e){const b=document.getElementById('jrDrpBtn');if(panel&&!panel.contains(e.target)&&!b.contains(e.target))close();}
+  function open(){if(panel){close();return;}panel=document.createElement('div');panel.className='drp2-panel';panel.innerHTML=render();document.body.appendChild(panel);const b=document.getElementById('jrDrpBtn').getBoundingClientRect();let _t=b.bottom+6;if(_t+panel.offsetHeight>window.innerHeight-8)_t=Math.max(8,window.innerHeight-panel.offsetHeight-8);panel.style.top=_t+'px';panel.style.left=Math.max(8,Math.min(b.left,window.innerWidth-panel.offsetWidth-8))+'px';bind();setTimeout(()=>document.addEventListener('mousedown',outside),0);}
+  document.addEventListener('DOMContentLoaded',()=>{start=fromYMD(document.getElementById('jrDateFrom').value);end=fromYMD(document.getElementById('jrDateTo').value);const b=start||new Date();leftYear=b.getFullYear();leftMonth=b.getMonth();trigger();document.getElementById('jrDrpBtn').onclick=open;});
+})();
+</script>
+{% endblock %}

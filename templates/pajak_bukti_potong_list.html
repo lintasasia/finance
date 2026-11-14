@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Bukti Potong Masuk - FinansialApp{% endblock %}
+{% block page_title %}<i class="fas fa-file-contract text-info me-2"></i>Bukti Potong Masuk{% endblock %}
+{% block content %}
+{% from '_pagination.html' import pagination with context %}
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <a href="/pajak" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Hub Pajak</a>
+  <a href="{{ url_for('pajak_pph_rekap') }}" class="btn btn-outline-primary btn-sm"><i class="fas fa-table-list me-1"></i>Rekap PPh Bulanan</a>
+</div>
+
+<div class="alert alert-info py-2 mb-3" style="font-size:.82rem">
+  <i class="fas fa-circle-info me-1"></i>
+  PPh yang <strong>dipotong customer</strong> atau dipungut instansi dari penjualan Anda, semua jenis, baik dari menu
+  Penjualan maupun Invoice. Bukti potong resminya dibuat customer; nomornya bisa Anda catat lewat tombol
+  <strong>Rincian</strong>. PPh yang tidak final menjadi kredit pajak di SPT Tahunan, sedangkan PPh final
+  (misalnya PPh 4 ayat (2)) dicatat sebagai beban.
+</div>
+
+<div class="card">
+  <div class="card-header py-2 fw-semibold" style="font-size:.88rem">
+    Total: {{ pg.total }} baris
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm mb-0 align-middle">
+        <thead class="table-light"><tr>
+          <th class="ps-3">No. Bukti</th>
+          <th>Tanggal</th>
+          <th>Customer (Pemotong)</th>
+          <th>Jenis PPh</th>
+          <th class="text-end">DPP</th>
+          <th class="text-end">Tarif</th>
+          <th class="text-end">PPh</th>
+          <th class="pe-3">Aksi</th>
+        </tr></thead>
+        <tbody>
+          {% for e in rows %}
+          {% set inv = inv_map.get(e.jurnal_id) %}
+          <tr>
+            <td class="ps-3">
+              <div style="font-family:monospace">{{ e.nomor_tampil }}</div>
+              {% if not e.nomor_bukti %}<div class="text-muted" style="font-size:.68rem">nomor arsip, bukti resmi belum dicatat</div>{% endif %}
+            </td>
+            <td class="text-nowrap">{{ e.tanggal|tgl }}</td>
+            <td>
+              <div class="fw-semibold">{{ e.pihak or '-' }}</div>
+              {% if e.npwp %}<div class="text-muted small">NPWP {{ e.npwp }}</div>{% endif %}
+              {% if inv %}<div class="text-muted small">Invoice {{ inv.nomor }}</div>{% endif %}
+            </td>
+            <td>
+              <span class="badge {{ 'bg-secondary' if e.final else 'bg-info' }}">{{ e.label }}{% if e.final %} final{% endif %}</span>
+              {% if e.retur %}<span class="badge bg-warning text-dark">Retur</span>{% endif %}
+              <div class="text-muted small">{{ e.uraian }}</div>
+            </td>
+            <td class="text-end text-rp text-nowrap">{{ e.dpp|rp if e.dpp is not none else '-' }}</td>
+            <td class="text-end text-nowrap">{{ (e.tarif|qty ~ '%') if e.tarif else '-' }}</td>
+            <td class="text-end fw-bold text-rp text-warning text-nowrap">{{ e.pph|rp }}</td>
+            <td class="pe-3 text-nowrap">
+              <a href="{{ url_for('pajak_pph_rincian', jurnal_id=e.jurnal_id, slot=e.slot, next=request.full_path) }}"
+                 class="btn btn-sm btn-outline-primary"><i class="fas fa-pen-to-square me-1"></i>Rincian</a>
+              {% if inv and e.slot == 'A' and not e.retur %}
+              <a href="/pajak/bukti-potong/{{ inv.id }}/cetak" target="_blank" class="btn btn-sm btn-outline-secondary"
+                 title="Cetak konsep bukti potong untuk customer"><i class="fas fa-print me-1"></i>Cetak</a>
+              {% endif %}
+              <a href="/transaksi/{{ e.jurnal_id }}" class="btn btn-sm btn-outline-secondary" title="Lihat transaksi"
+                 aria-label="Lihat transaksi"><i class="fas fa-eye"></i></a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="text-center text-muted py-4">
+            Belum ada PPh yang dipotong customer. Aktifkan bagian Pajak di
+            <a href="/pemasukan">Penjualan</a> atau <a href="/invoice/baru">Invoice</a> lalu pilih jenis PPh yang dipotong.
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{{ pagination(pg) }}
+
+{% if draft %}
+<div class="card mt-3">
+  <div class="card-header py-2 fw-semibold" style="font-size:.88rem">
+    <i class="fas fa-file-invoice me-1 text-muted"></i>Invoice ber-PPh yang belum dicatat ke jurnal
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm mb-0 align-middle">
+        <thead class="table-light"><tr>
+          <th class="ps-3">Invoice</th><th>Tanggal</th><th>Customer</th><th>Jenis PPh</th>
+          <th class="text-end">PPh</th><th class="pe-3">Aksi</th>
+        </tr></thead>
+        <tbody>
+          {% for d in draft %}
+          <tr>
+            <td class="ps-3">{{ d.nomor }}</td>
+            <td class="text-nowrap">{{ d.tanggal|tgl }}</td>
+            <td>{{ d.pelanggan }}</td>
+            <td>{% if (d.pph23_nominal or 0) > 0 %}{{ pph_label(d.pph_objek) }}{% endif %}{% if (d.pph23_nominal or 0) > 0 and (d.pph22_nominal or 0) > 0 %}, {% endif %}{% if (d.pph22_nominal or 0) > 0 %}PPh 22{% endif %}</td>
+            <td class="text-end text-rp text-nowrap">{{ ((d.pph23_nominal or 0) + (d.pph22_nominal or 0))|rp }}</td>
+            <td class="pe-3 text-nowrap">
+              <a href="/invoice/{{ d.id }}" class="btn btn-sm btn-outline-secondary"><i class="fas fa-eye me-1"></i>Invoice</a>
+              {% if (d.pph23_nominal or 0) > 0 %}
+              <a href="/pajak/bukti-potong/{{ d.id }}/cetak" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="fas fa-print me-1"></i>Cetak</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card-footer small text-muted">Belum masuk rekap PPh. Klik <strong>Catat ke Jurnal</strong> di halaman invoice supaya ikut terhitung.</div>
+</div>
+{% endif %}
+
+<div class="mt-3 p-3" style="background:var(--card-h);border-radius:8px;font-size:.82rem">
+  <strong><i class="fas fa-lightbulb me-1 text-warning"></i>Ke mana larinya:</strong>
+  PPh 23 ke akun <strong>1181</strong>, PPh 22 ke <strong>1183</strong>, PPh 21 ke <strong>1195</strong>
+  (ketiganya kredit pajak, klaim di SPT Tahunan). PPh 4 ayat (2) dan PPh 15 bersifat final, dicatat ke
+  <strong>6171 Beban PPh Final</strong>.
+</div>
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Identitas Pajak - FinansialApp{% endblock %}
+{% block page_title %}<i class="fas fa-id-card text-primary me-2"></i>Identitas Pajak{% endblock %}
+{% block content %}
+
+<div class="row justify-content-center">
+<div class="col-lg-7">
+
+<div class="d-flex gap-2 mb-3">
+  <a href="/pajak" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Hub Pajak</a>
+</div>
+
+<form method="POST" class="card">
+  <div class="card-header py-2 fw-semibold" style="font-size:.88rem">Identitas usaha sebagai wajib pajak</div>
+  <div class="card-body">
+    <p class="small text-muted mb-3">
+      Tampil di bukti potong yang Anda buat sebagai pemotong, Bukti Bayar Pajak, dan Rekap PPh. Semua isian opsional;
+      nama dan alamat yang dikosongkan memakai data di <a href="/invoice/pengaturan">Pengaturan Invoice</a>.
+    </p>
+    <div class="row g-3">
+      <div class="col-12">
+        <label class="form-label small fw-semibold" for="pj_nama">Nama wajib pajak</label>
+        <input type="text" name="nama_wp" id="pj_nama" class="form-control form-control-sm" maxlength="120"
+               value="{{ data.nama_wp }}" placeholder="{{ inv_s.inv_nama }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold" for="pj_npwp">NPWP</label>
+        <input type="text" name="npwp" id="pj_npwp" class="form-control form-control-sm" inputmode="numeric" maxlength="30"
+               value="{{ data.npwp }}" placeholder="16 digit">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold" for="pj_nitku">NITKU</label>
+        <input type="text" name="nitku" id="pj_nitku" class="form-control form-control-sm" inputmode="numeric" maxlength="30"
+               value="{{ data.nitku }}" placeholder="22 digit">
+      </div>
+      <div class="col-12">
+        <label class="form-label small fw-semibold" for="pj_alamat">Alamat</label>
+        <textarea name="alamat_wp" id="pj_alamat" class="form-control form-control-sm" rows="2" maxlength="300"
+                  placeholder="{{ inv_s.inv_alamat }}">{{ data.alamat_wp }}</textarea>
+      </div>
+    </div>
+    <div class="form-text mt-2">Titik, strip, dan spasi pada NPWP/NITKU dibuang otomatis; yang disimpan hanya angka.</div>
+  </div>
+  <div class="card-footer d-flex gap-2">
+    <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-save me-1"></i>Simpan</button>
+    <a href="/pajak" class="btn btn-outline-secondary btn-sm">Batal</a>
+  </div>
+</form>
+
+</div>
+</div>
+{% endblock %}

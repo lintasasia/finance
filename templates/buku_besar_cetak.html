@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buku Besar {{ sd|tgl }} - {{ ed|tgl }} - {{ nama_usaha }}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;font-size:11px;color:#111;background:#f3f4f6}
+.kertas{background:#fff;max-width:900px;margin:0 auto;padding:28px 32px 36px}
+.alat{position:sticky;top:0;z-index:5;background:#111827;color:#fff;padding:10px 16px;display:flex;flex-wrap:wrap;
+      gap:10px;align-items:center;justify-content:space-between;font-size:13px}
+.alat button{border:0;border-radius:6px;padding:7px 14px;font-weight:700;cursor:pointer;font-size:13px}
+.alat .utama{background:#16a34a;color:#fff}
+.alat .kedua{background:#374151;color:#fff}
+.kop{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:14px}
+.kop .usaha{font-size:16px;font-weight:800}
+.kop .judul{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-top:2px}
+.kop .meta{text-align:right;font-size:10.5px;color:#374151;line-height:1.5}
+h2{font-size:12.5px;font-weight:800;margin:0 0 6px}
+.akun-kepala{display:flex;flex-wrap:wrap;gap:4px 18px;align-items:baseline;border:1px solid #d1d5db;border-radius:6px;
+             padding:7px 10px;margin-bottom:6px;background:#f9fafb}
+.akun-kepala .nama{font-size:13px;font-weight:800}
+.akun-kepala .ket{font-size:10.5px;color:#4b5563}
+table{width:100%;border-collapse:collapse}
+th,td{padding:4px 6px;border-bottom:1px solid #e5e7eb;vertical-align:top}
+thead th{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#374151;background:#f3f4f6;border-bottom:1.5px solid #9ca3af;text-align:left}
+td.n,th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+td.tgl{white-space:nowrap}
+td.ref{font-family:Consolas,monospace;font-size:10px;color:#4b5563;white-space:nowrap}
+tr.awal td{font-style:italic;color:#4b5563;background:#fafafa}
+tfoot td{font-weight:800;border-top:1.5px solid #111;border-bottom:0}
+.neg{color:#b91c1c}
+.kosong{color:#6b7280;text-align:center;padding:10px}
+.bagian{margin-top:22px}
+.bagian.baru{break-before:page;page-break-before:always;margin-top:0}
+.catatan{font-size:10px;color:#6b7280;margin-top:8px;line-height:1.5}
+tr{break-inside:avoid;page-break-inside:avoid}
+thead{display:table-header-group}
+@media print{
+  @page{size:A4 portrait;margin:12mm 10mm}
+  body{background:#fff}
+  .alat{display:none}
+  .kertas{max-width:none;padding:0}
+}
+@media (max-width:640px){ .kertas{padding:16px 12px} .tabel-geser{overflow-x:auto} }
+</style>
+</head>
+<body>
+<div class="alat">
+  <div>Buku Besar: <strong>{{ bagian|length }} akun</strong>{% if dilewati %} ({{ dilewati|length }} akun tanpa mutasi &amp; saldo dilewati){% endif %}</div>
+  <div style="display:flex;gap:8px">
+    <button type="button" class="utama" onclick="window.print()">Cetak / Simpan PDF</button>
+    <button type="button" class="kedua" onclick="window.close()">Tutup</button>
+  </div>
+</div>
+
+<div class="kertas">
+  <div class="kop">
+    <div>
+      <div class="usaha">{{ nama_usaha }}</div>
+      <div class="judul">Buku Besar</div>
+    </div>
+    <div class="meta">
+      Periode {{ sd|tgl }} sampai {{ ed|tgl }}<br>
+      {{ bagian|length }} akun dicetak<br>
+      Dicetak {{ dicetak|tgl }} {{ dicetak[11:16] }}
+    </div>
+  </div>
+
+  {% if not bagian %}
+  <div class="kosong" style="border:1px dashed #d1d5db;border-radius:6px;padding:24px">
+    Semua akun yang dipilih tidak punya mutasi maupun saldo pada periode ini, jadi tidak ada yang dicetak.
+    Hilangkan centang "Lewati akun tanpa mutasi dan saldo" untuk tetap mencetaknya.
+  </div>
+  {% else %}
+
+  {% if bagian|length > 1 %}
+  {# Ringkasan: satu baris per akun, supaya pembaca langsung melihat posisi semua akun sebelum rinciannya. #}
+  <h2>Ringkasan</h2>
+  <div class="tabel-geser">
+  <table>
+    <thead>
+      <tr><th style="width:62px">Kode</th><th>Nama Akun</th><th style="width:62px">Saldo Normal</th>
+        <th class="n">Saldo Awal</th><th class="n">Debit</th><th class="n">Kredit</th><th class="n">Saldo Akhir</th></tr>
+    </thead>
+    <tbody>
+      {% for b in bagian %}
+      <tr>
+        <td class="ref">{{ b.akun.kode }}</td>
+        <td>{{ b.akun.nama }}</td>
+        <td>{{ 'Debit' if b.akun.saldo_normal == 'DEBIT' else 'Kredit' }}</td>
+        <td class="n{% if b.saldo_awal < 0 %} neg{% endif %}">{{ b.saldo_awal|rp }}</td>
+        <td class="n">{{ b.total_debit|rp }}</td>
+        <td class="n">{{ b.total_kredit|rp }}</td>
+        <td class="n{% if b.saldo_akhir < 0 %} neg{% endif %}">{{ b.saldo_akhir|rp }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+
+  {% for b in bagian %}
+  <section class="bagian{% if halaman_baru and (bagian|length > 1 or not loop.first) %} baru{% endif %}">
+    <div class="akun-kepala">
+      <span class="nama">{{ b.akun.kode }}, {{ b.akun.nama }}</span>
+      <span class="ket">{{ b.akun.tipe }} · saldo normal {{ 'Debit' if b.akun.saldo_normal == 'DEBIT' else 'Kredit' }}</span>
+      <span class="ket">{{ b.entri|length }} mutasi</span>
+    </div>
+    <div class="tabel-geser">
+    <table>
+      <thead>
+        <tr><th style="width:28px">#</th><th style="width:78px">Tanggal</th><th style="width:96px">Ref / ID</th><th>Keterangan</th>
+          <th class="n" style="width:100px">Debit</th><th class="n" style="width:100px">Kredit</th><th class="n" style="width:110px">Saldo</th></tr>
+      </thead>
+      <tbody>
+        <tr class="awal">
+          <td>0</td><td class="tgl">{{ sd|tgl }}</td><td></td><td>Saldo awal (sebelum periode)</td><td></td><td></td>
+          <td class="n{% if b.saldo_awal < 0 %} neg{% endif %}">{{ b.saldo_awal|rp }}</td>
+        </tr>
+        {% for e in b.entri %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td class="tgl">{{ e.tanggal|tgl }}</td>
+          <td class="ref">#{{ e.jurnal_id }}{% if e.referensi %} · {{ e.referensi }}{% endif %}</td>
+          <td>{{ e.keterangan }}</td>
+          <td class="n">{{ e.debit|rp if e.debit > 0 else '-' }}</td>
+          <td class="n">{{ e.kredit|rp if e.kredit > 0 else '-' }}</td>
+          <td class="n{% if e.saldo < 0 %} neg{% endif %}">{{ e.saldo|rp }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="kosong">Tidak ada mutasi pada periode ini</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr><td colspan="4">Total periode</td><td class="n">{{ b.total_debit|rp }}</td><td class="n">{{ b.total_kredit|rp }}</td>
+          <td class="n{% if b.saldo_akhir < 0 %} neg{% endif %}">{{ b.saldo_akhir|rp }}</td></tr>
+      </tfoot>
+    </table>
+    </div>
+  </section>
+  {% endfor %}
+  {% endif %}
+
+  {% if dilewati %}
+  <div class="catatan">Tidak dicetak karena tidak ada mutasi dan saldonya nol pada periode ini:
+    {% for a in dilewati %}{{ a.kode }} {{ a.nama }}{% if not loop.last %}, {% endif %}{% endfor %}.</div>
+  {% endif %}
+</div>
+{% if auto_cetak and bagian %}
+<script>
+// Dibuka dari tombol "Cetak" di Buku Besar: langsung tampilkan dialog cetak sesudah halaman selesai dimuat.
+window.addEventListener('load', function(){ setTimeout(function(){ window.print(); }, 250); });
+</script>
+{% endif %}
+</body>
+</html>

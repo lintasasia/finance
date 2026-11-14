@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
+  <title>Kasir POS</title>
+  {# Bingkai kasir untuk cetak Bluetooth langsung. Halaman ini tidak pernah berganti dan
+     memegang sambungan printer; layar kasir & struk berjalan di dalam iframe dan meminjam
+     sambungan itu. Penjelasan lengkap di static/pos_printer.js. #}
+  <link rel="manifest" href="/manifest.webmanifest?app=pos">
+  <meta name="theme-color" content="#0A0A0A">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='pwa/kasir-32.png') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='pwa/kasir-180.png') }}">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Kasir">
+  <style>
+    html,body{margin:0;height:100%;overflow:hidden;background:#F4F4F2}
+    #kasirFrame{display:block;border:0;width:100%;height:100vh;height:100dvh}
+  </style>
+  <script src="{{ url_for('static', filename='pos_printer.js') }}"></script>
+  <script>
+    if (window.PosPrinter) window.PosPrinter.mulai({induk: true, kertas: '{{ kertas }}'});
+    if ('serviceWorker' in navigator && window.isSecureContext) {
+      window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
+    }
+  </script>
+</head>
+<body>
+  <iframe id="kasirFrame" src="{{ url_for('pos_kasir') }}" title="Kasir POS"></iframe>
+  <script>
+  (function () {
+    var f = document.getElementById('kasirFrame');
+    f.addEventListener('load', function () {
+      try {
+        var lok = f.contentWindow.location;
+        // Keluar dari bingkai kalau pindah ke luar POS (mis. tombol App ke dasbor).
+        if (lok.pathname.indexOf('/pos') !== 0) { window.location.href = lok.href; return; }
+        // Alamat bingkai tidak boleh berisi /pos/app lagi (bingkai di dalam bingkai).
+        if (lok.pathname === '/pos/app') { f.contentWindow.location.replace('{{ url_for('pos_kasir') }}'); return; }
+        document.title = f.contentDocument.title || 'Kasir POS';
+      } catch (e) { /* abaikan */ }
+    });
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+{# Tanda tangan & stempel otomatis di dokumen cetak. Data dari ttd_dokumen('<kode>') di app.py.
+   gaya()            : CSS, dipanggil sekali per halaman (hanya kalau T.aktif, supaya dokumen yang belum memakai
+                       fitur ini keluar persis seperti dulu).
+   {% call blok(T, tinggi) %}baris di bawah tanda tangan{% endcall %}
+                     : ruang tanda tangan setinggi `tinggi` (pengganti spasi kosong lama) + isi caller (garis, nama
+                       usaha, nama & jabatan). Stempel DITUMPUK lewat grid di sel yang sama, BUKAN posisi absolut:
+                       tinggi blok = yang tertinggi di antara isi dan stempel, jadi stempel selalu di dalam kolom,
+                       ikut pindah halaman bersama tanda tangan (.ttd-kolom break-inside:avoid) dan tidak pernah
+                       terpotong di batas halaman. Puncak stempel sejajar puncak tanda tangan, sehingga label di
+                       atasnya (Hormat kami, Disetujui oleh) tetap bersih; stempel menimpa sisi kiri tanda tangan
+                       dan nama di bawahnya seperti cap sungguhan. mix-blend-mode multiply: tinta di atas tinta,
+                       teks di bawah stempel tetap terbaca.
+   saklar(T)         : centang di bilah alat (layar saja) untuk mencetak tanpa gambar, misalnya untuk
+                       ditandatangani basah. Tidak diingat: setiap kali dibuka, ikut Pengaturan. #}
+
+{% macro gaya() %}
+<style>
+.ttd-kolom{break-inside:avoid;page-break-inside:avoid}
+.ttd-tumpuk{display:grid;align-items:start;justify-items:center}
+.ttd-tumpuk>.ttd-lapis{grid-area:1/1;width:100%}
+.ttd-tumpuk>.ttd-stempel{grid-area:1/1;position:relative;z-index:1;opacity:.92}
+.ttd-area{position:relative}
+.ttd-area .ttd-tangan{position:absolute;left:50%;bottom:-2mm;transform:translateX(-50%);width:auto;height:auto;max-width:100%;max-height:calc(100% + 2mm)}
+.ttd-gbr{pointer-events:none;mix-blend-mode:multiply}
+.ttd-orang{font-size:11px;font-weight:600;margin-top:1px}
+.ttd-jabatan{font-size:10px;margin-top:1px}
+body.tanpa-ttd .ttd-gbr{visibility:hidden}
+body.dm-mode .ttd-gbr{display:none!important}
+.ttd-saklar{display:inline-flex;align-items:center;gap:6px;font-family:'Segoe UI',Arial,sans-serif;font-size:13px;color:#334155;cursor:pointer;user-select:none;vertical-align:middle}
+.ttd-saklar input{width:16px;height:16px;margin:0;cursor:pointer}
+@media print{.ttd-saklar{display:none!important}}
+</style>
+{% endmacro %}
+
+{# Ukuran & geseran stempel dari _ttd_stempel_geometri (app.py): lebar dibatasi kolom tersempit, geseran ke kiri
+   dibatasi supaya tidak keluar kolom. Tanpa tanda tangan, stempel di tengah. #}
+{% macro gaya_stempel(g, ada_ttd) -%}
+{% if g.w %}width:{{ g.w }}mm;height:{{ g.h }}mm{% else %}width:auto;height:auto;max-height:{{ g.h }}mm;max-width:42mm{% endif %};transform:translateX({{ ('-' ~ g.geser ~ 'mm') if ada_ttd else '0' }})
+{%- endmacro %}
+
+{% macro blok(T, tinggi) %}
+<div class="ttd-tumpuk">
+  <div class="ttd-lapis">
+    <div class="ttd-area" style="height:{{ tinggi }}">
+      {%- if T.ttd %}<img class="ttd-gbr ttd-tangan" src="{{ T.ttd }}" alt="">{% endif -%}
+    </div>
+    {{ caller() }}
+  </div>
+  {%- if T.stempel %}{% set g = T.stempel_geo %}
+  <img class="ttd-gbr ttd-stempel{% if not T.ttd %} ttd-sendiri{% endif %}" src="{{ T.stempel }}" alt="" style="{{ gaya_stempel(g, T.ttd) }}">
+  {%- endif %}
+</div>
+{% endmacro %}
+
+{% macro orang(T) %}
+{%- if T.nama %}<div class="ttd-orang">{{ T.nama }}</div>{% endif %}
+{%- if T.jabatan %}<div class="ttd-jabatan">{{ T.jabatan }}</div>{% endif %}
+{%- endmacro %}
+
+{% macro saklar(T) %}
+{%- if T.gambar %}<label class="ttd-saklar" title="Kosongkan centang untuk mencetak tanpa gambar tanda tangan dan stempel, misalnya untuk ditandatangani basah."><input type="checkbox" checked autocomplete="off" onchange="document.body.classList.toggle('tanpa-ttd', !this.checked)"> TTD &amp; stempel</label>
+<script>
+// Browser bisa memulihkan centang saat halaman dimuat ulang / Kembali; kelas body ikut disamakan supaya yang
+// tercetak selalu sesuai centang yang terlihat.
+window.addEventListener('pageshow', function () {
+  var s = document.querySelector('.ttd-saklar input');
+  if (s) document.body.classList.toggle('tanpa-ttd', !s.checked);
+});
+</script>{% endif %}
+{%- endmacro %}

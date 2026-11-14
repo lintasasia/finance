@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Beranda - FinansialApp{% endblock %}
+{% block page_title %}Beranda{% endblock %}
+{% block content %}
+<div class="card" style="max-width:560px">
+  <div class="card-body p-4">
+    <div class="d-flex gap-3 align-items-start">
+      <i class="fas fa-user-lock mt-1" style="font-size:1.4rem;color:var(--ink)"></i>
+      <div>
+        <h5 class="fw-bold mb-2">Akun ini belum diberi akses</h5>
+        <p class="mb-2" style="line-height:1.55">Akun <strong>{{ session.nama or session.username }}</strong> belum punya hak untuk membuka Dashboard maupun halaman kerja lain.</p>
+        <p class="mb-0 text-muted" style="line-height:1.55">Minta admin mencentang hak akses yang dibutuhkan di menu Pengaturan, bagian daftar user. Setelah itu keluar lalu masuk lagi.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Bukti Potong {{ jenis_label }} - {{ no_bp }}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;color:#000;font-family:'Segoe UI',Arial,sans-serif}
+body{font-size:12px;background:#fff;padding:30px 36px}
+.header{border-bottom:3px solid #000;padding-bottom:14px;margin-bottom:18px;text-align:center}
+.title{font-size:18px;font-weight:900;letter-spacing:.04em;text-transform:uppercase}
+.subtitle{font-size:11px;margin-top:4px;color:#555}
+.no-bp{font-size:13px;font-weight:700;margin-top:8px;font-family:monospace}
+.row{display:flex;gap:14px;margin-bottom:14px}
+.col{flex:1}
+.box{border:1px solid #ccc;border-radius:5px;padding:10px 14px;background:#fafafa}
+.box-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#555;margin-bottom:4px}
+.box-val{font-size:12px;font-weight:600}
+table{width:100%;border-collapse:collapse;margin:12px 0}
+table th, table td{border:1px solid #ccc;padding:6px 10px;font-size:11px;text-align:left}
+table th{background:#f0f0f0;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.06em}
+table.ident{margin:0;border:0}
+table.ident td{border:0;padding:2px 0}
+table.ident td:first-child{width:35%}
+.text-right{text-align:right}
+.text-center{text-align:center}
+.calc-row td{font-weight:600}
+.calc-total td{background:#fef9c3;font-weight:900;font-size:13px;color:#92400e}
+.tt-box{margin-top:30px;display:flex;justify-content:space-between}
+.tt-block{width:200px;text-align:center}
+.tt-line{margin-top:60px;border-top:1px solid #000;padding-top:5px;font-size:11px}
+.notes{margin-top:20px;padding:10px;background:#fef9c3;border:1px solid #f59e0b;font-size:10px;line-height:1.5}
+.btn-print{background:#2563eb;color:#fff;border:none;padding:8px 16px;border-radius:5px;cursor:pointer;font-size:13px;margin-right:8px;margin-bottom:14px}
+.btn-back{background:#f1f5f9;color:#475569;border:none;padding:8px 16px;border-radius:5px;cursor:pointer;font-size:13px;margin-bottom:14px}
+@media print{.no-print{display:none!important} body{padding:14mm 16mm}}
+</style>
+</head>
+<body>
+
+<div class="no-print">
+  <button onclick="window.print()" class="btn-print">&#128424; Cetak / Save PDF</button>
+  <button onclick="window.close()" class="btn-back">Tutup</button>
+</div>
+
+<!-- Header -->
+<div class="header">
+  <div class="title">Bukti Pemotongan {{ jenis_label }}{% if final %} (Final){% endif %}</div>
+  <div class="subtitle">Konsep untuk ditandatangani pemotong. Bukti potong resmi dibuat pemotong di Coretax DJP.</div>
+  <div class="no-bp">No: {{ no_bp }}{% if rinci.tanggal_bukti %} &middot; {{ rinci.tanggal_bukti|tgl }}{% endif %}</div>
+</div>
+
+<!-- Pemotong (yang motong) = Customer / Pelanggan -->
+<div class="row">
+  <div class="col">
+    <div class="box">
+      <div class="box-label">A. Identitas Pemotong (Customer)</div>
+      <table class="ident">
+        <tr><td>Nama</td><td>: <strong>{{ rinci.nama or inv.pelanggan }}</strong></td></tr>
+        <tr><td>NPWP / NIK</td><td>: {{ rinci.npwp or '-' }}</td></tr>
+        {% if rinci.nitku %}<tr><td>NITKU</td><td>: {{ rinci.nitku }}</td></tr>{% endif %}
+        <tr><td>Alamat</td><td>: {{ inv.alamat_pelanggan or '-' }}</td></tr>
+        <tr><td>Telp</td><td>: {{ inv.telepon_pelanggan or '-' }}</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="col">
+    <div class="box">
+      <div class="box-label">B. Identitas Yang Dipotong (Penerima Penghasilan)</div>
+      <table class="ident">
+        <tr><td>Nama</td><td>: <strong>{{ ident.nama }}</strong></td></tr>
+        <tr><td>NPWP / NIK</td><td>: {{ ident.npwp or '-' }}</td></tr>
+        {% if ident.nitku %}<tr><td>NITKU</td><td>: {{ ident.nitku }}</td></tr>{% endif %}
+        <tr><td>Alamat</td><td>: {{ ident.alamat or '-' }}</td></tr>
+        <tr><td>Telp</td><td>: {{ ident.telepon or '-' }}</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Pemotongan -->
+<div class="box-label">C. Rincian Penghasilan dan Pemotongan {{ jenis_label }}</div>
+<table>
+  <thead>
+    <tr>
+      <th style="width:40px">No</th>
+      <th style="width:90px">Kode Objek</th>
+      <th>Jenis Penghasilan</th>
+      <th style="width:130px" class="text-right">Dasar Pengenaan Pajak</th>
+      <th style="width:70px" class="text-right">Tarif</th>
+      <th style="width:130px" class="text-right">PPh Dipotong</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="text-center">1</td>
+      <td>{{ kode_objek or '-' }}</td>
+      <td>
+        {{ uraian }}, berdasarkan Invoice <strong>{{ inv.nomor }}</strong> ({{ inv.tanggal|tgl }})
+        {% if items %}
+        <ul style="margin:4px 0 0 18px;font-size:10px;color:#555">
+          {% for it in items %}
+          <li>{{ it.deskripsi }} - Qty {{ it.qty|qty }} {{ it.satuan }}</li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </td>
+      <td class="text-right">{{ dpp|rp }}</td>
+      <td class="text-right">{{ inv.pph23_persen|qty }}%</td>
+      <td class="text-right"><strong>{{ inv.pph23_nominal|rp }}</strong></td>
+    </tr>
+    <tr class="calc-total">
+      <td colspan="5" class="text-right">JUMLAH {{ jenis_label|upper }} YANG DIPOTONG</td>
+      <td class="text-right">{{ inv.pph23_nominal|rp }}</td>
+    </tr>
+  </tbody>
+</table>
+
+{% if rinci.fasilitas or rinci.dok_jenis or rinci.dok_nomor %}
+<table>
+  {% if rinci.fasilitas %}
+  <tr><td style="width:30%">Fasilitas</td>
+      <td>{% for k, l in PPH_FASILITAS %}{% if k == rinci.fasilitas %}{{ l }}{% endif %}{% endfor %}{% if rinci.no_fasilitas %}, nomor {{ rinci.no_fasilitas }}{% endif %}</td></tr>
+  {% endif %}
+  {% if rinci.dok_jenis or rinci.dok_nomor %}
+  <tr><td>Dokumen dasar</td>
+      <td>{% for k, l in PPH_DOK_JENIS %}{% if k and k == rinci.dok_jenis %}{{ l }}{% endif %}{% endfor %} {{ rinci.dok_nomor }}{% if rinci.dok_tanggal %} tanggal {{ rinci.dok_tanggal|tgl }}{% endif %}</td></tr>
+  {% endif %}
+</table>
+{% endif %}
+
+<div class="notes">
+  <strong>Catatan:</strong>
+  <ul style="margin:4px 0 0 18px">
+    {% if final %}
+    <li>{{ jenis_label }} atas penghasilan ini bersifat final, tidak dikreditkan dalam SPT Tahunan penerima penghasilan.</li>
+    {% else %}
+    <li>{{ jenis_label }} yang telah dipotong merupakan kredit pajak bagi penerima penghasilan dalam SPT Tahunan PPh.</li>
+    {% endif %}
+    <li>Mohon pemotong menerbitkan bukti potong resmi di Coretax DJP dan mengirimkan salinannya kepada penerima penghasilan.</li>
+    {% if rinci.catatan %}<li>{{ rinci.catatan }}</li>{% endif %}
+  </ul>
+</div>
+
+<!-- Tanda Tangan -->
+<div class="tt-box">
+  <div class="tt-block">
+    <div style="font-size:11px;margin-bottom:6px">Yang Dipotong,</div>
+    <div class="tt-line"><strong>{{ ident.nama }}</strong></div>
+  </div>
+  <div class="tt-block">
+    <div style="font-size:11px;margin-bottom:6px">Pemotong {{ jenis_label }},</div>
+    <div class="tt-line"><strong>{{ rinci.nama or inv.pelanggan }}</strong></div>
+  </div>
+</div>
+
+</body>
+</html>

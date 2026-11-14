@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pilih Jenis Usaha - Demo Finance by Cliff</title>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+<style>
+/* ════════ Cliff.gosipinbisnis Design System — pilih usaha (demo multi-sektor) ════════ */
+:root{
+  --ink:#0A0A0A; --paper:#FFFFFF; --paper-soft:#F4F4F2;
+  --gray-600:#555555; --gray-500:#6E6E6E; --gray-300:#C9C9C9;
+  --line:rgba(10,10,10,.12);
+  --font-display:'Anton','Arial Narrow',sans-serif;
+  --font-body:'Montserrat',system-ui,-apple-system,sans-serif;
+  --r-md:12px; --r-lg:20px; --r-pill:999px;
+  --shadow-xl:0 30px 80px rgba(0,0,0,.45);
+  --ease-out:cubic-bezier(.25,1,.5,1);
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{font-family:var(--font-body);background:var(--ink);color:var(--ink);-webkit-font-smoothing:antialiased}
+
+.pu-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:40px 16px;position:relative;overflow:hidden}
+.pu-deco{position:absolute;color:rgba(255,255,255,.08);pointer-events:none}
+.pu-deco.a{width:260px;left:-30px;top:40px}
+.pu-deco.b{width:70px;right:8%;bottom:9%}
+
+.pu-dialog{position:relative;z-index:1;width:100%;max-width:720px;background:var(--paper);border-radius:var(--r-lg);
+  box-shadow:var(--shadow-xl);overflow:hidden}
+.pu-head{padding:28px 32px 10px}
+.pu-lockup{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+.pu-lockup .plate{width:34px;height:34px;border-radius:9px;background:var(--ink);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.pu-lockup .plate img{width:80%;height:80%;object-fit:contain;filter:invert(1)}
+.pu-lockup .word{font-family:var(--font-display);font-size:17px;text-transform:uppercase;letter-spacing:.01em;line-height:1}
+.pu-lockup .tag{margin-left:auto;font-size:11px;font-weight:700;letter-spacing:.06em;padding:5px 10px;border-radius:var(--r-pill);
+  background:var(--paper-soft);color:var(--gray-600);border:1px solid var(--line)}
+.pu-head h1{font-weight:800;font-size:clamp(24px,3.4vw,31px);line-height:1.15;margin:0 0 8px;letter-spacing:-.01em;text-wrap:balance}
+.pu-head p{margin:0;font-size:14px;line-height:1.6;color:var(--gray-600);max-width:58ch}
+
+.pu-alert{margin:14px 32px 0;border-radius:var(--r-md);font-size:13px;font-weight:600;padding:11px 14px;background:#FCF3DC;color:#6b4f00;border:1px solid #f1e0ad}
+
+.pu-list{list-style:none;margin:0;padding:14px 18px 10px}
+.pu-row{display:grid;grid-template-columns:52px 1fr 24px;gap:16px;align-items:center;padding:14px;border-radius:var(--r-md);
+  color:inherit;text-decoration:none;transition:background .18s var(--ease-out)}
+a.pu-row:hover,a.pu-row:focus-visible{background:var(--paper-soft)}
+a.pu-row:focus-visible,.pu-sub a:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.pu-row + .pu-row, li + li .pu-row{border-top:1px solid var(--line);border-radius:0}
+li:first-child .pu-row{border-top:0}
+.pu-ikon{width:52px;height:52px;border-radius:14px;background:var(--ink);color:var(--paper);display:flex;align-items:center;justify-content:center;font-size:20px}
+.pu-kel{font-family:var(--font-display);font-size:23px;text-transform:uppercase;line-height:1;letter-spacing:.01em}
+.pu-nama{font-weight:700;font-size:13px;margin-top:5px}
+.pu-desk{font-size:12.5px;line-height:1.55;color:var(--gray-600);margin-top:3px;max-width:62ch}
+.pu-angka{font-size:11.5px;font-weight:600;color:var(--gray-500);margin-top:6px}
+.pu-panah{color:var(--gray-500);font-size:15px;transition:transform .18s var(--ease-out),color .18s}
+a.pu-row:hover .pu-panah{transform:translateX(3px);color:var(--ink)}
+.pu-row.mati{opacity:.55;cursor:not-allowed}
+
+/* Manufaktur: dua pilihan di dalam satu baris */
+.pu-sub{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.pu-sub a{display:block;text-decoration:none;color:inherit;border:1.5px solid var(--line);border-radius:var(--r-md);padding:11px 13px;
+  transition:border-color .18s var(--ease-out),background .18s}
+.pu-sub a:hover{border-color:var(--ink);background:var(--paper-soft)}
+.pu-sub .t{display:flex;align-items:center;gap:8px;font-weight:800;font-size:13px}
+.pu-sub .t i{font-size:13px;width:16px;text-align:center}
+.pu-sub .d{font-size:12px;line-height:1.5;color:var(--gray-600);margin-top:4px}
+.pu-sub .n{font-size:11px;font-weight:600;color:var(--gray-500);margin-top:5px}
+
+.pu-foot{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;justify-content:space-between;padding:14px 32px 18px;
+  border-top:1px solid var(--line);font-size:12px;line-height:1.55;color:var(--gray-600)}
+.pu-foot strong{color:var(--ink)}
+.pu-lanjut{font-weight:700;color:var(--ink);text-decoration:none;border-bottom:1.5px solid var(--ink);white-space:nowrap}
+
+@media (prefers-reduced-motion:no-preference){
+  .pu-dialog{animation:pu-masuk .5s var(--ease-out) both}
+  .pu-list > li{animation:pu-baris .45s var(--ease-out) both}
+  .pu-list > li:nth-child(2){animation-delay:.04s}
+  .pu-list > li:nth-child(3){animation-delay:.08s}
+  .pu-list > li:nth-child(4){animation-delay:.12s}
+  .pu-list > li:nth-child(5){animation-delay:.16s}
+  @keyframes pu-masuk{from{transform:translateY(14px) scale(.985);opacity:.4}to{transform:none;opacity:1}}
+  @keyframes pu-baris{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+}
+@media (max-width:600px){
+  .pu-wrap{padding:16px;justify-content:flex-start}
+  .pu-head{padding:22px 18px 6px}
+  .pu-alert{margin:12px 18px 0}
+  .pu-list{padding:8px 4px 6px}
+  .pu-row{grid-template-columns:44px 1fr;gap:12px;padding:14px}
+  .pu-ikon{width:44px;height:44px;border-radius:12px;font-size:17px}
+  .pu-panah{display:none}
+  .pu-sub{grid-template-columns:1fr}
+  .pu-foot{padding:14px 18px 18px}
+  .pu-deco{display:none}
+}
+</style>
+</head>
+<body>
+<div class="pu-wrap">
+  <svg class="pu-deco a" viewBox="0 0 240 60" fill="none" aria-hidden="true">
+    <path d="M4 40 C 36 6, 64 6, 92 34 S 150 60, 176 30 S 224 8, 236 22" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path>
+  </svg>
+  <svg class="pu-deco b" viewBox="0 0 120 80" fill="none" aria-hidden="true">
+    <path d="M40 14 H22 V66 H40 M80 14 H98 V66 H80" stroke="currentColor" stroke-width="6" stroke-linecap="square"></path>
+  </svg>
+
+  <section class="pu-dialog" role="dialog" aria-modal="true" aria-labelledby="puJudul">
+    <header class="pu-head">
+      <div class="pu-lockup">
+        <div class="plate"><img src="{{ url_for('static', filename='brand/finance-by-cliff-login.png') }}" alt=""></div>
+        <div class="word">Finance by Cliff</div>
+        <span class="tag">Website demo</span>
+      </div>
+      <h1 id="puJudul">Apa jenis usaha Anda?</h1>
+      <p>Pilih yang paling mirip. Anda langsung masuk ke contoh pembukuan satu tahun penuh untuk usaha itu, tanpa perlu login.</p>
+    </header>
+
+    {% with msgs = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in msgs %}<div class="pu-alert">{{ msg }}</div>{% endfor %}
+    {% endwith %}
+
+    <ul class="pu-list">
+      {% for k in kelompok %}
+      <li>
+        {% if k.pilihan|length == 1 %}
+          {% set p = k.pilihan[0] %}
+          {% if p.siap %}
+          <a class="pu-row" href="{{ url_for('demo_masuk', kode=p.kode) }}">
+          {% else %}
+          <div class="pu-row mati" aria-disabled="true">
+          {% endif %}
+            <div class="pu-ikon"><i class="fas {{ p.ikon }}" aria-hidden="true"></i></div>
+            <div>
+              <div class="pu-kel">{{ k.kelompok }}</div>
+              <div class="pu-nama">{{ p.nama }}</div>
+              <div class="pu-desk">{{ p.ringkas }}</div>
+              {% if p.angka %}<div class="pu-angka">{{ p.angka|join(' · ') }}</div>{% endif %}
+              {% if not p.siap %}<div class="pu-angka">Data contoh sedang disiapkan</div>{% endif %}
+            </div>
+            <i class="fas fa-arrow-right pu-panah" aria-hidden="true"></i>
+          {% if p.siap %}</a>{% else %}</div>{% endif %}
+        {% else %}
+          <div class="pu-row" role="group" aria-label="{{ k.kelompok }}">
+            <div class="pu-ikon"><i class="fas {{ k.pilihan[0].ikon }}" aria-hidden="true"></i></div>
+            <div>
+              <div class="pu-kel">{{ k.kelompok }}</div>
+              <div class="pu-desk">Ada {{ k.pilihan|length }} contoh. Pilih yang paling dekat dengan usaha Anda.</div>
+              <div class="pu-sub">
+                {% for p in k.pilihan %}
+                <a href="{{ url_for('demo_masuk', kode=p.kode) if p.siap else '#' }}"{% if not p.siap %} aria-disabled="true" style="opacity:.55;pointer-events:none"{% endif %}>
+                  <div class="t"><i class="fas {{ p.ikon }}" aria-hidden="true"></i>{{ p.nama }}</div>
+                  <div class="d">{{ p.ringkas }}</div>
+                  {% if p.angka %}<div class="n">{{ p.angka|join(' · ') }}</div>{% endif %}
+                  {% if not p.siap %}<div class="n">Data contoh sedang disiapkan</div>{% endif %}
+                </a>
+                {% endfor %}
+              </div>
+            </div>
+            <span></span>
+          </div>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+
+    <footer class="pu-foot">
+      <span>Data contoh dipakai bersama pengunjung lain dan <strong>dikembalikan ke kondisi awal tiap 2 jam</strong>. Silakan coba input apa saja.</span>
+      {% if aktif %}
+        {% for k in kelompok %}{% for p in k.pilihan %}{% if p.kode == aktif %}
+        <a class="pu-lanjut" href="{{ url_for('dashboard') }}">Lanjutkan di {{ p.kelompok }} <i class="fas fa-arrow-right" style="margin-left:4px"></i></a>
+        {% endif %}{% endfor %}{% endfor %}
+      {% endif %}
+    </footer>
+  </section>
+</div>
+</body>
+</html>

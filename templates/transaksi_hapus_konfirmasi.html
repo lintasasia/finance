@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Konfirmasi Hapus Transaksi{% endblock %}
+{% block page_title %}Konfirmasi Hapus Transaksi{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-lg-7">
+  <div class="card border-danger">
+    <div class="card-header bg-danger text-white">
+      <i class="fas fa-trash me-2"></i>Konfirmasi Hapus Transaksi
+    </div>
+    <div class="card-body">
+      <p class="mb-2">Anda akan menghapus transaksi berikut:</p>
+      <table class="table table-sm mb-3">
+        <tr><th style="width:170px">No. Transaksi</th><td>{{ j.nomor_tx or ('#' ~ j.id) }}</td></tr>
+        <tr><th>Tanggal</th><td>{{ j.tanggal }}</td></tr>
+        <tr><th>Keterangan</th><td>{{ j.keterangan }}</td></tr>
+        {% if j.pihak %}<tr><th>Pihak</th><td>{{ j.pihak }}</td></tr>{% endif %}
+        <tr><th>Total</th><td class="fw-bold text-rp">{{ total|rp }}</td></tr>
+      </table>
+      {% if items %}
+      <div class="text-muted mb-1" style="font-size:.8rem">Rincian item:</div>
+      <ul style="font-size:.85rem">
+        {% for it in items %}
+        <li>{{ it.deskripsi or ('Produk #' ~ it.produk_id) }} — {{ it.qty|qty }} {{ it.satuan }} @ {{ it.harga|rp }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      {% if stok_rows %}
+      <div class="text-muted mb-1" style="font-size:.8rem">Stok yang ikut dibalik:</div>
+      <ul style="font-size:.85rem">
+        {% for s in stok_rows %}
+        <li>{{ s.produk_nama or ('Produk #' ~ s.produk_id) }}{% if s.produk_kode %} ({{ s.produk_kode }}){% endif %}:
+            {{ 'masuk' if s.jenis == 'MASUK' else ('keluar' if s.jenis == 'KELUAR' else 'penyesuaian') }} {{ s.qty|qty }} {{ s.produk_satuan or '' }}</li>
+        {% endfor %}
+      </ul>
+      {% if j.tipe_tx == 'SALDO_AWAL' and stok_rows|length > 1 %}
+      <div class="alert alert-warning py-2" style="font-size:.84rem">
+        <i class="fas fa-triangle-exclamation me-1"></i>Jurnal stok awal ini mencakup <strong>{{ stok_rows|length }} produk</strong>.
+        Menghapusnya membuang stok awal <strong>semua</strong> produk di atas. Untuk membetulkan satu produk saja,
+        pakai Inventory, menu Atur Stok, lalu Stok Awal pada produk itu.
+      </div>
+      {% endif %}
+      {% if posisi_terlewati %}
+      <div class="alert alert-warning py-2" style="font-size:.84rem">
+        <i class="fas fa-triangle-exclamation me-1"></i>Sesudah stok awal atau koreksi ini sudah ada transaksi lain untuk produk
+        yang sama. Menghapusnya hanya mengurangi stok sebanyak selisih yang dulu dicatat, dan HPP produknya tidak dihitung
+        ulang. Lebih aman membetulkannya lewat Atur Stok.
+      </div>
+      {% endif %}
+      {% endif %}
+      {% if sa_info %}
+      {% set n_dep = sa_info.aset|sum(attribute='n_penyusutan') %}
+      <div class="alert alert-light border py-2" style="font-size:.84rem;line-height:1.55">
+        <i class="fas fa-flag-checkered me-1"></i>Ikut terhapus: {{ sa_info.piutang|length }} baris piutang,
+        {{ sa_info.hutang|length }} baris hutang, dan {{ sa_info.aset|length }} aset tetap{% if n_dep %} beserta
+        {{ n_dep }} jurnal penyusutannya{% endif %}.
+        {% if sa_info.bisa_koreksi %}Kalau hanya angkanya yang salah, lebih mudah
+        <a href="{{ url_for('saldo_awal_form', jurnal=j.id) }}">koreksi saldo awal</a> tanpa menghapus.{% endif %}
+      </div>
+      {% if sa_info.beku %}
+      {# Akun beku (lihat _saldo_awal_jurnal): hapus diblokir; tampilkan kandidat jurnal penyebabnya. #}
+      <div class="alert alert-warning py-2" style="font-size:.82rem;line-height:1.55">
+        <i class="fas fa-lock me-1"></i>Jurnal koreksi hapus yang menyentuh akun yang dikunci
+        (lihat juga <a href="{{ url_for('transaksi_list', tipe_tx='KOREKSI') }}">semua jurnal Koreksi Hapus Piutang/Hutang</a>):
+        {% for kode, b in sa_info.beku|dictsort %}
+        <div class="mt-1">Akun {{ kode }}, selisih {{ b.celah|abs|rp }}:
+          {% for k in b.koreksi %}<a href="/transaksi/{{ k.id }}">{{ k.nomor_tx or ('#' ~ k.id) }}</a> {{ k.tanggal|tgl }}, {{ k.keterangan }}, {{ k.nilai|rp }}{{ '; ' if not loop.last else '.' }}{% else %}tidak ditemukan otomatis.{% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% endif %}
+
+      {% if sa_terkait %}
+      {# Jurnal koreksi hapus versi lama yang menutup selisih akun saldo awal beku (lihat
+         _saldo_awal_terkait_koreksi). #}
+      <div class="alert alert-info py-2" style="font-size:.84rem;line-height:1.55">
+        <i class="fas fa-flag-checkered me-1"></i>Jurnal ini menutup selisih saldo awal akun
+        <strong>{{ sa_terkait[1]|join(', ') }}</strong>. Sesudah dihapus, akun itu bisa dikoreksi lagi di Setup
+        Saldo Awal, dan aplikasi langsung membuka halaman itu. Sampai koreksinya disimpan, Neraca dan daftar
+        tagihan akun itu berbeda.
+      </div>
+      {% endif %}
+      {% if block %}
+      <div class="alert alert-danger">
+        <i class="fas fa-ban me-1"></i><strong>Tidak bisa dihapus.</strong> {{ block }}
+      </div>
+      {% set bisa_buka = kunci and kunci.terkunci and session.role in ('ADMIN','FINANCE') %}
+      {% if bisa_buka %}
+      <p class="mb-3" style="font-size:.88rem">
+        Transaksi ini terkunci karena {{ kunci.alasan }}. Tombol <strong>Buka Kunci untuk Koreksi</strong>
+        menampilkan apa saja yang akan dibatalkan, lalu membukanya sekaligus.
+      </p>
+      {% endif %}
+      <div class="d-flex flex-wrap gap-2">
+        <a href="/transaksi/{{ j.id }}" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Kembali</a>
+        {% if bisa_buka %}
+        <a href="/transaksi/{{ j.id }}/buka-kunci" class="btn btn-warning"><i class="fas fa-lock-open me-1"></i>Buka Kunci untuk Koreksi</a>
+        {% endif %}
+      </div>
+      {% else %}
+        {% if hpp_warn %}
+        <div class="alert alert-warning">
+          <i class="fas fa-circle-info me-1"></i>
+          <strong>Catatan:</strong> transaksi ini punya <strong>mutasi stok yang lebih baru</strong>.
+          COGS transaksi lain tetap terkunci; stok dan rata-rata HPP barang sisa otomatis disesuaikan.
+          Khusus menghapus pembelian yang barangnya sudah terjual, stok bisa menjadi minus.
+        </div>
+        {% endif %}
+        {% if bisa_pulih %}
+        <div class="alert alert-info">
+          <i class="fas fa-box-archive me-1"></i>
+          Transaksi akan <strong>diarsipkan</strong> (bukan dihapus permanen) dan bisa
+          <strong>dipulihkan</strong> kapan saja dari menu <em>Jurnal</em>, tombol <em>Arsip</em>.
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+          <i class="fas fa-box-archive me-1"></i>
+          Transaksi akan <strong>diarsipkan</strong> sebagai catatan, tapi jenis ini <strong>tidak bisa dipulihkan
+          otomatis</strong>{% if alasan_pulih %}: {{ alasan_pulih }}{% else %}.{% endif %}
+        </div>
+        {% endif %}
+        <form method="POST" action="/transaksi/{{ j.id }}/hapus">
+          {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+          <a href="/transaksi/{{ j.id }}" class="btn btn-outline-secondary">Batal</a>
+          <button type="submit" class="btn btn-danger">
+            <i class="fas fa-box-archive me-1"></i>Arsipkan &amp; Hapus
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+</div>
+{% endblock %}

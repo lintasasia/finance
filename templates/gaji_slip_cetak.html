@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slip Gaji - {{ p.nama_karyawan }} - {{ nm_bln }} {{ p.periode_tahun }}</title>
+<style>
+@page{size:A4;margin:14mm 16mm}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;font-size:11.5px;line-height:1.45;color:#111;background:#e5e7eb;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact}
+.toolbar{display:flex;gap:8px;justify-content:center;padding:12px 16px;flex-wrap:wrap}
+.toolbar button,.toolbar a{font:inherit;font-size:13px;font-weight:600;border:0;border-radius:6px;padding:8px 16px;
+  cursor:pointer;text-decoration:none}
+.toolbar .cetak{background:#1d4ed8;color:#fff}
+.toolbar .kembali{background:#fff;color:#334155;border:1px solid #cbd5e1}
+.lembar{width:210mm;min-height:297mm;margin:0 auto 24px;background:#fff;padding:14mm 16mm;
+  box-shadow:0 2px 14px rgba(15,23,42,.14)}
+.kop{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;border-bottom:2px solid #111;padding-bottom:10px}
+.kop-kiri{display:flex;gap:12px;align-items:center;min-width:0}
+.kop-logo{max-height:58px;max-width:120px;object-fit:contain;display:block}
+.usaha{font-size:16px;font-weight:800;line-height:1.25}
+.usaha-sub{font-size:10.5px;color:#374151;margin-top:2px;white-space:pre-line}
+.judul{text-align:right;flex-shrink:0}
+.judul h1{font-size:19px;font-weight:800;letter-spacing:.08em}
+.judul .periode{font-size:12.5px;font-weight:700;margin-top:1px}
+.judul .nomor{font-size:10px;color:#374151;margin-top:2px;font-family:Consolas,'Courier New',monospace}
+.rahasia{display:inline-block;margin-top:5px;font-size:8.5px;font-weight:700;letter-spacing:.14em;border:1px solid #111;padding:1px 6px}
+.identitas{display:grid;grid-template-columns:1fr 1fr;gap:0 28px;margin-top:12px}
+.identitas table{border-collapse:collapse;width:100%}
+.identitas td{padding:2.5px 0;vertical-align:top}
+.identitas td.lbl{color:#4b5563;width:38%}
+.identitas td.isi{font-weight:600}
+.rincian{width:100%;border-collapse:collapse;margin-top:14px;table-layout:fixed}
+.rincian th{background:#f1f5f9;border:1px solid #cbd5e1;padding:6px 8px;text-align:left;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.rincian th.nom{text-align:right}
+.rincian td{border-left:1px solid #cbd5e1;border-right:1px solid #cbd5e1;padding:4px 8px;vertical-align:top}
+.rincian td.nom{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.rincian .ket{color:#4b5563;font-size:10px}
+.rincian tr.akhir td{border-bottom:1px solid #cbd5e1}
+.rincian tr.total td{border:1px solid #cbd5e1;background:#f8fafc;font-weight:700}
+.bersih{margin-top:12px;border:2px solid #111;padding:9px 12px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.bersih .lbl{font-size:12px;font-weight:800;letter-spacing:.05em}
+.bersih .nom{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.terbilang{margin-top:5px;font-size:11px}
+.terbilang em{font-style:italic}
+.bagian{margin-top:14px}
+.bagian h2{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#374151;margin-bottom:4px}
+.kecil{width:100%;border-collapse:collapse}
+.kecil td{padding:3px 8px;border-bottom:1px dotted #cbd5e1}
+.kecil td.nom{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.kecil tr.total td{border-bottom:0;border-top:1px solid #94a3b8;font-weight:700}
+.catatan{margin-top:12px;border:1px solid #e2e8f0;background:#f8fafc;padding:7px 10px;font-size:10.5px;white-space:pre-line}
+.ttd{display:flex;justify-content:space-between;margin-top:26px;gap:24px}
+.ttd .blok{width:42%;text-align:center}
+.ttd .tgl{min-height:16px}
+.ttd .garis{margin-top:58px;border-top:1px solid #111;padding-top:4px;font-weight:700}
+.kaki{margin-top:20px;border-top:1px solid #e2e8f0;padding-top:6px;font-size:9.5px;color:#4b5563}
+@media print{
+  body{background:#fff}
+  .toolbar{display:none!important}
+  .lembar{width:auto;min-height:0;margin:0;padding:0;box-shadow:none}
+}
+@media screen and (max-width:820px){
+  .lembar{width:auto;min-height:0;padding:16px}
+  .kop{flex-direction:column}
+  .judul{text-align:left}
+  .identitas{grid-template-columns:1fr}
+}
+</style>
+{% import '_ttd_stempel.html' as TS %}
+{% set T = ttd_dokumen('slip') if ttd_dokumen is defined else {} %}
+{% if T.aktif %}{{ TS.gaya() }}{% endif %}
+</head>
+<body>
+
+<div class="toolbar">
+  <button type="button" class="cetak" onclick="window.print()">Cetak / Simpan PDF</button>
+  <a class="kembali" href="{{ url_for('gaji_slip', pid=p.id) }}">Kembali ke slip</a>
+  {{ TS.saklar(T) }}
+</div>
+
+<div class="lembar">
+  <div class="kop">
+    <div class="kop-kiri">
+      {% if inv_s.inv_logo %}<img class="kop-logo" src="/static/uploads/{{ inv_s.inv_logo }}" alt="Logo {{ inv_s.inv_nama }}">{% endif %}
+      <div>
+        <div class="usaha">{{ inv_s.inv_nama or 'Usaha Saya' }}</div>
+        {% if inv_s.inv_alamat %}<div class="usaha-sub">{{ inv_s.inv_alamat }}</div>{% endif %}
+        {% if inv_s.inv_telepon or inv_s.inv_email %}
+        <div class="usaha-sub">{% if inv_s.inv_telepon %}Telp {{ inv_s.inv_telepon }}{% endif %}{% if inv_s.inv_telepon and inv_s.inv_email %} &middot; {% endif %}{{ inv_s.inv_email or '' }}</div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="judul">
+      <h1>SLIP GAJI</h1>
+      <div class="periode">{{ nm_bln }} {{ p.periode_tahun }}</div>
+      <div class="nomor">No. SG-{{ p.periode_tahun }}{{ '%02d' % p.periode_bulan }}-{{ '%04d' % p.id }}</div>
+      <div class="rahasia">RAHASIA</div>
+    </div>
+  </div>
+
+  <div class="identitas">
+    <table>
+      <tr><td class="lbl">Nama</td><td class="isi">{{ p.nama_karyawan }}</td></tr>
+      <tr><td class="lbl">No. Karyawan</td><td class="isi">{{ p.no_karyawan or '-' }}</td></tr>
+      <tr><td class="lbl">Jabatan</td><td class="isi">{{ p.jabatan or '-' }}</td></tr>
+      <tr><td class="lbl">Status Kerja</td><td class="isi">{{ (p.status_kerja or '-')|title }}</td></tr>
+    </table>
+    <table>
+      <tr><td class="lbl">Status PTKP</td><td class="isi">{{ p.status_pajak }} ({{ PTKP.get(p.status_pajak, 54000000)|rp }}/th)</td></tr>
+      <tr><td class="lbl">NPWP</td><td class="isi">{{ p.npwp or '-' }}</td></tr>
+      <tr><td class="lbl">Periode</td><td class="isi">{{ nm_bln }} {{ p.periode_tahun }}</td></tr>
+      <tr><td class="lbl">Tanggal Bayar</td><td class="isi">{{ tgl_bayar|tgl if tgl_bayar else '-' }}</td></tr>
+    </table>
+  </div>
+
+  {% set baris = [penghasilan|length, potongan|length]|max %}
+  <table class="rincian">
+    <colgroup><col style="width:31%"><col style="width:19%"><col style="width:31%"><col style="width:19%"></colgroup>
+    <thead>
+      <tr><th>Penghasilan</th><th class="nom">Jumlah</th><th>Potongan</th><th class="nom">Jumlah</th></tr>
+    </thead>
+    <tbody>
+      {% for i in range(baris) %}
+      <tr{% if loop.last %} class="akhir"{% endif %}>
+        {% if i < penghasilan|length %}<td>{{ penghasilan[i][0] }}{% if loop.first and keterangan_upah %}<div class="ket">{{ keterangan_upah }}</div>{% endif %}</td><td class="nom">{{ penghasilan[i][1]|rp }}</td>{% else %}<td></td><td></td>{% endif %}
+        {% if i < potongan|length %}<td>{{ potongan[i][0] }}</td><td class="nom">{{ potongan[i][1]|rp }}</td>{% else %}<td></td><td></td>{% endif %}
+      </tr>
+      {% endfor %}
+      <tr class="total">
+        <td>Total Penghasilan Bruto</td><td class="nom">{{ p.penghasilan_bruto|rp }}</td>
+        <td>Total Potongan</td><td class="nom">{{ total_potongan|rp }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="bersih">
+    <span class="lbl">GAJI BERSIH (TAKE HOME PAY)</span>
+    <span class="nom">{{ p.gaji_bersih|rp }}</span>
+  </div>
+  <div class="terbilang">Terbilang: <em>{{ terbilang }}</em></div>
+
+  {% if tanggungan %}
+  <div class="bagian">
+    <h2>Iuran yang dibayar perusahaan (tidak memotong gaji)</h2>
+    <table class="kecil">
+      {% for label, nilai in tanggungan %}
+      <tr><td>{{ label }}</td><td class="nom">{{ nilai|rp }}</td></tr>
+      {% endfor %}
+      <tr class="total"><td>Total iuran perusahaan</td><td class="nom">{{ total_tanggungan|rp }}</td></tr>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if p.catatan %}
+  <div class="catatan"><strong>Catatan:</strong> {{ p.catatan }}</div>
+  {% endif %}
+
+  <div class="ttd">
+    <div class="blok">
+      <div class="tgl"></div>
+      <div>Diterima oleh,</div>
+      <div class="garis">{{ p.nama_karyawan }}</div>
+    </div>
+    <div class="blok{% if T.aktif %} ttd-kolom{% endif %}">
+      <div class="tgl">{% if tgl_bayar %}{{ tgl_bayar|tgl }}{% endif %}</div>
+      <div>Disetujui oleh,</div>
+      {% if T.aktif %}
+      {% call TS.blok(T, '58px') %}
+      <div class="garis" style="margin-top:0">{{ inv_s.inv_nama or 'Perusahaan' }}</div>
+      {{ TS.orang(T) }}
+      {% endcall %}
+      {% else %}
+      <div class="garis">{{ inv_s.inv_nama or 'Perusahaan' }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="kaki">Slip gaji ini bersifat rahasia dan hanya untuk karyawan yang bersangkutan.</div>
+</div>
+
+</body>
+</html>

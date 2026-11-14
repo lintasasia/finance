@@ -1,0 +1,525 @@
+{% extends "base.html" %}
+{% block title %}Tanda Tangan & Stempel - FinansialApp{% endblock %}
+{% block page_title %}Tanda Tangan &amp; Stempel{% endblock %}
+{% block content %}
+{% import '_ttd_stempel.html' as TS %}
+{{ TS.gaya() }}
+<style>
+.ttd-kotak{border:1px dashed var(--pgb);border-radius:8px;min-height:120px;display:flex;align-items:center;justify-content:center;
+  padding:10px;background:repeating-conic-gradient(#e5e7eb 0% 25%,#fff 0% 50%) 50%/16px 16px}
+.ttd-kotak img{max-width:100%;max-height:160px;object-fit:contain;display:block}
+.ttd-kotak .kosong{color:#64748b;font-size:.75rem;text-align:center;background:rgba(255,255,255,.85);padding:6px 10px;border-radius:6px}
+.ttd-label-kecil{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3);margin-bottom:4px}
+.ttd-info{font-size:.75rem;color:var(--tx3);min-height:1.1em}
+.ttd-info.galat{color:#dc2626;font-weight:600}
+.ttd-kertas{background:#fff;color:#000;border:1px solid var(--pgb);border-radius:8px;padding:12mm 10mm 10mm;display:flex;justify-content:flex-end;overflow:hidden}
+.ttd-kertas *{color:#000}
+.ttd-panduan{color:var(--tx)}
+.ttd-panduan li{margin-bottom:.3rem}
+</style>
+
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  <a href="/settings" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Pengaturan</a>
+  <a href="/invoice/pengaturan" class="btn btn-outline-secondary btn-sm"><i class="fas fa-file-invoice me-1"></i>Pengaturan Invoice</a>
+</div>
+
+<div class="alert alert-info py-2" style="font-size:.82rem">
+  <i class="fas fa-circle-info me-1"></i>
+  Tanda tangan dan stempel di sini otomatis tercetak di kolom tanda tangan usaha Anda pada dokumen yang dicentang
+  di bawah. Gambar disimpan di database, tidak bisa dibuka lewat alamat publik, dan hanya muncul di halaman
+  cetak sesudah login. Di halaman cetak ada centang <strong>TTD &amp; stempel</strong> untuk sesekali mencetak
+  tanpa gambar.
+</div>
+
+<form method="POST" enctype="multipart/form-data" id="ttdForm">
+<input type="hidden" name="ttd_dok_ada" value="1">
+<div class="row g-3">
+
+  {% for jenis, judul, ikon, sekarang, warna in [
+       ('ttd', 'Tanda Tangan', 'fa-signature', s.ttd, [('asli', 'Warna asli'), ('hitam', 'Hitam'), ('biru', 'Biru tua')]),
+       ('stempel', 'Stempel', 'fa-stamp', s.stempel, [('asli', 'Warna asli'), ('biru', 'Biru'), ('ungu', 'Ungu'), ('merah', 'Merah'), ('hitam', 'Hitam')])] %}
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header py-2"><span class="fw-semibold" style="font-size:.88rem"><i class="fas {{ ikon }} me-2 text-primary"></i>{{ judul }}</span></div>
+      <div class="card-body">
+        <div class="row g-2 mb-2">
+          <div class="col-6">
+            <div class="ttd-label-kecil">Tersimpan</div>
+            <div class="ttd-kotak">
+              {% if sekarang %}<img src="{{ sekarang }}" alt="{{ judul }} tersimpan">
+              {% else %}<div class="kosong"><i class="fas {{ ikon }} d-block mb-1"></i>Belum ada</div>{% endif %}
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="ttd-label-kecil">Hasil olahan baru</div>
+            <div class="ttd-kotak">
+              <img id="{{ jenis }}Hasil" alt="" hidden>
+              <div class="kosong" id="{{ jenis }}HasilKosong">Pilih berkas di bawah</div>
+            </div>
+          </div>
+        </div>
+
+        <label class="form-label small fw-semibold mb-1" for="{{ jenis }}File">Unggah {{ judul|lower }} baru</label>
+        <input type="file" name="{{ jenis }}_file" id="{{ jenis }}File" class="form-control form-control-sm ttd-file"
+               data-jenis="{{ jenis }}" accept="image/png,image/jpeg,image/webp">
+        <div class="ttd-info mt-1" id="{{ jenis }}Info"></div>
+
+        <div class="ttd-olah mt-2" id="{{ jenis }}Olah" hidden>
+          <div class="form-check form-switch mb-1">
+            <input class="form-check-input ttd-ubah" type="checkbox" id="{{ jenis }}Latar" checked>
+            <label class="form-check-label small" for="{{ jenis }}Latar">Hapus latar kertas (jadi transparan)</label>
+          </div>
+          <div class="d-flex align-items-center gap-2 mb-1" id="{{ jenis }}PekaBaris">
+            <label class="small text-nowrap" for="{{ jenis }}Peka">Kepekaan</label>
+            <input type="range" class="form-range ttd-ubah" id="{{ jenis }}Peka" min="-40" max="40" step="1" value="0">
+            <button type="button" class="btn btn-link btn-sm p-0 text-nowrap" data-reset="{{ jenis }}Peka">Normal</button>
+          </div>
+          <div class="ttd-info mb-1">Geser ke kanan kalau masih ada bercak latar, ke kiri kalau goresan tipis ikut hilang.</div>
+          <div class="d-flex gap-2 flex-wrap align-items-center">
+            <select class="form-select form-select-sm ttd-ubah" id="{{ jenis }}Warna" style="width:auto" aria-label="Warna tinta">
+              {% for k, l in warna %}<option value="{{ k }}">{{ l }}</option>{% endfor %}
+            </select>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-putar="{{ jenis }}">
+              <i class="fas fa-rotate-right me-1"></i>Putar 90°</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-batal="{{ jenis }}">Batal pilih</button>
+          </div>
+        </div>
+
+        {% if sekarang %}
+        <div class="form-check mt-2">
+          <input class="form-check-input" type="checkbox" name="{{ jenis }}_hapus" value="1" id="{{ jenis }}Hapus">
+          <label class="form-check-label small text-danger" for="{{ jenis }}Hapus">Hapus {{ judul|lower }} tersimpan</label>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header py-2"><span class="fw-semibold" style="font-size:.88rem"><i class="fas fa-user-pen me-2 text-primary"></i>Penanda Tangan &amp; Ukuran</span></div>
+      <div class="card-body">
+        <div class="mb-2">
+          <label class="form-label small mb-1" for="ttdNama">Nama penanda tangan <span class="text-muted">(opsional)</span></label>
+          <input type="text" name="ttd_nama" id="ttdNama" class="form-control form-control-sm ttd-ubah-teks"
+                 value="{{ s.nama }}" maxlength="80" placeholder="Budi Santoso">
+        </div>
+        <div class="mb-2">
+          <label class="form-label small mb-1" for="ttdJabatan">Jabatan <span class="text-muted">(opsional)</span></label>
+          <input type="text" name="ttd_jabatan" id="ttdJabatan" class="form-control form-control-sm ttd-ubah-teks"
+                 value="{{ s.jabatan }}" maxlength="80" placeholder="Direktur">
+          <div class="form-text">Dicetak kecil di bawah nama usaha. Kosongkan kalau cukup nama usaha.</div>
+        </div>
+        <label class="form-label small mb-1">Ukuran stempel di kertas</label>
+        <div class="d-flex gap-3 flex-wrap">
+          {% for k, mm in TTD_STEMPEL_MM.items() %}
+          <div class="form-check">
+            <input class="form-check-input ttd-ubah-teks" type="radio" name="stempel_ukuran" id="ukur{{ k }}" value="{{ k }}"
+                   data-mm="{{ mm }}" {% if k == s.ukuran %}checked{% endif %}>
+            <label class="form-check-label small" for="ukur{{ k }}">{{ k|capitalize }} ({{ mm }} mm)</label>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="form-text">Tinggi stempel saat dicetak. Stempel perusahaan bulat umumnya 35 sampai 40 mm; Sedang
+          sudah pas untuk kolom tanda tangan.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header py-2"><span class="fw-semibold" style="font-size:.88rem"><i class="fas fa-file-circle-check me-2 text-success"></i>Dokumen yang Otomatis Bertanda Tangan</span></div>
+      <div class="card-body">
+        {% for k, d in TTD_DOKUMEN.items() %}
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="ttd_dok" value="{{ k }}" id="dok{{ k }}"
+                 {% if k in s.dok %}checked{% endif %}>
+          <label class="form-check-label small" for="dok{{ k }}">{{ d[0] }}</label>
+        </div>
+        {% endfor %}
+        <div class="form-text">Hanya kolom pihak usaha Anda yang diisi (Hormat kami, Disiapkan oleh, Disetujui oleh,
+          Dibuat oleh, Pemotong). Kolom pelanggan, vendor, dan karyawan tetap kosong untuk ditandatangani mereka.
+          Bukti potong dari pembeli tidak ikut karena yang menandatangani adalah pembeli.</div>
+        <div class="form-text">Invoice format thermal dan dot matrix tidak mencetak gambar (printer 1 bit, hasilnya
+          pecah), sama seperti logo.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header py-2"><span class="fw-semibold" style="font-size:.88rem"><i class="fas fa-eye me-2 text-info"></i>Contoh di Dokumen (ukuran sebenarnya)</span></div>
+      <div class="card-body">
+        <div class="ttd-kertas">
+          <div class="ttd-kolom" style="text-align:center;min-width:160px">
+            <div style="font-size:11px">Hormat kami,</div>
+            {# Susunan sama dengan macro blok() di _ttd_stempel.html, ditulis langsung supaya JS bisa menukar gambarnya. #}
+            <div class="ttd-tumpuk">
+              <div class="ttd-lapis">
+                <div class="ttd-area" style="height:60px">
+                  <img class="ttd-gbr ttd-tangan" id="cTtd" src="{{ s.ttd }}" alt="" {% if not s.ttd %}hidden{% endif %}>
+                </div>
+                <div style="border-top:1px solid #000;padding-top:4px;font-size:12px;font-weight:700">{{ inv_nama }}</div>
+                <div class="ttd-orang" id="cNama" {% if not s.nama %}hidden{% endif %}>{{ s.nama }}</div>
+                <div class="ttd-jabatan" id="cJabatan" {% if not s.jabatan %}hidden{% endif %}>{{ s.jabatan }}</div>
+              </div>
+              <img class="ttd-gbr ttd-stempel{% if not s.ttd %} ttd-sendiri{% endif %}" id="cStempel" src="{{ s.stempel }}" alt=""
+                   style="{{ TS.gaya_stempel(s.stempel_geo, s.ttd) }}" {% if not s.stempel %}hidden{% endif %}>
+            </div>
+          </div>
+        </div>
+        <div class="form-text">Pratinjau memakai pilihan yang belum disimpan. Sesudah disimpan, cek juga lewat
+          <a href="/invoice/preview" target="_blank">Preview Invoice</a>.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header py-2"><span class="fw-semibold" style="font-size:.88rem"><i class="fas fa-book-open me-2 text-warning"></i>Panduan Format &amp; Ukuran</span></div>
+      <div class="card-body ttd-panduan" style="font-size:.82rem">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="fw-semibold mb-1">Tanda tangan</div>
+            <ul class="mb-0 ps-3">
+              <li>Tanda tangan di kertas putih polos (HVS), bukan kertas bergaris, dengan pulpen atau spidol hitam
+                atau biru tua yang goresannya tebal.</li>
+              <li>Scan 300 dpi, atau foto tegak lurus dari atas di tempat terang tanpa bayangan. Biarkan tanda tangan
+                memenuhi sebagian besar foto.</li>
+              <li>Format PNG (paling baik kalau latarnya sudah transparan), JPG, atau WEBP.</li>
+              <li>Ukuran gambar minimal 600 x 200 piksel, ideal sekitar 1200 x 500 piksel.</li>
+              <li>Tercetak setinggi kira-kira 16 mm, lebarnya mengikuti kolom (sekitar 40 sampai 50 mm).</li>
+            </ul>
+          </div>
+          <div class="col-md-6">
+            <div class="fw-semibold mb-1">Stempel</div>
+            <ul class="mb-0 ps-3">
+              <li>Cap di kertas putih polos dengan tinta yang masih segar, tekan rata supaya hurufnya tidak putus.</li>
+              <li>Scan 300 dpi atau foto tegak lurus, lalu potong rapat di sekeliling cap.</li>
+              <li>Format PNG (transparan lebih baik), JPG, atau WEBP.</li>
+              <li>Ukuran gambar minimal 400 x 400 piksel, ideal sekitar 800 x 800 piksel untuk stempel bulat.</li>
+              <li>Tercetak setinggi 24, 28, atau 34 mm sesuai pilihan, menimpa sisi kiri tanda tangan seperti cap
+                sungguhan.</li>
+            </ul>
+          </div>
+          <div class="col-12">
+            <div class="fw-semibold mb-1">Yang dikerjakan otomatis saat memilih berkas</div>
+            <ul class="mb-0 ps-3">
+              <li>Latar kertas dihapus jadi transparan, warna tinta dipulihkan, tepi kosong dipotong, dan gambar
+                diperkecil (tanda tangan maksimal 900 piksel, stempel 700 piksel) lalu disimpan sebagai PNG.</li>
+              <li>Berkas asli maksimal 25 MB. Tanpa JavaScript, berkas dikirim apa adanya dan maksimal 1,5 MB.</li>
+            </ul>
+          </div>
+          <div class="col-12">
+            <div class="fw-semibold mb-1">Keamanan</div>
+            <ul class="mb-0 ps-3">
+              <li>Hanya Admin yang bisa mengubah halaman ini. Setiap perubahan tercatat di Log Aktivitas.</li>
+              <li>Siapa pun yang boleh mencetak dokumen yang dicentang bisa menghasilkan dokumen bertanda tangan.
+                Atur hak akses user dan centang hanya dokumen yang memang perlu.</li>
+              <li>Ini gambar tanda tangan, bukan tanda tangan elektronik tersertifikasi. Untuk kontrak atau dokumen
+                pajak resmi, pakai tanda tangan basah atau layanan tanda tangan elektronik tersertifikasi.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 d-flex gap-2 align-items-center flex-wrap">
+    <button type="submit" class="btn btn-primary" id="ttdSimpan"><i class="fas fa-save me-1"></i>Simpan</button>
+    <a href="/invoice/preview" target="_blank" class="btn btn-outline-info"><i class="fas fa-eye me-1"></i>Preview Invoice</a>
+    <span class="ttd-info" id="ttdStatus"></span>
+  </div>
+
+</div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Pengolah gambar tanda tangan & stempel, seluruhnya di browser (server tidak punya pustaka gambar).
+// Alur: berkas asli -> kanvas kerja (maks 1600 px) -> latar kertas jadi transparan + warna tinta dipulihkan
+// -> warna tinta (opsional) -> potong tepi kosong -> perkecil ke batas -> PNG. Hasilnya MENGGANTI isi
+// input berkas (DataTransfer), jadi form terkirim biasa dan server tetap memeriksa jenis & ukurannya.
+(function () {
+  var MAKS_SISI = {ttd: 900, stempel: 700};
+  var MAKS_ASLI = 25 * 1024 * 1024;
+  var MAKS_HASIL = 1200 * 1024;
+  var KOLOM_MM = 42;   // sama dengan TTD_KOLOM_MIN_MM di app.py
+  var WARNA = {hitam: [17, 17, 17], biru: [23, 52, 140], ungu: [88, 40, 140], merah: [185, 28, 28]};
+  // Per gambar: {memuat, img, putar, asli: File, hasil: Blob, url, nomor, proses}. nomor & proses PER GAMBAR,
+  // supaya mengolah stempel tidak membatalkan olahan tanda tangan yang masih berjalan (dan sebaliknya).
+  var keadaan = {ttd: null, stempel: null};
+  var bisaGanti = (function () { try { return !!new DataTransfer().items; } catch (e) { return false; } })();
+
+  function $(id) { return document.getElementById(id); }
+  function info(jenis, teks, galat) {
+    var el = $(jenis + 'Info'); el.textContent = teks || ''; el.classList.toggle('galat', !!galat);
+  }
+  function kb(n) { return n < 1024 * 1024 ? Math.round(n / 1024) + ' KB' : (n / 1048576).toFixed(1).replace('.', ',') + ' MB'; }
+
+  // Kanvas kerja: gambar diputar kelipatan 90 derajat dan diperkecil supaya sisi terpanjang <= 1600 px.
+  function kanvasKerja(img, putar) {
+    var w = img.naturalWidth, h = img.naturalHeight, s = Math.min(1, 1600 / Math.max(w, h));
+    var sw = Math.max(1, Math.round(w * s)), sh = Math.max(1, Math.round(h * s));
+    var tegak = putar % 180 !== 0;
+    var c = document.createElement('canvas');
+    c.width = tegak ? sh : sw; c.height = tegak ? sw : sh;
+    var x = c.getContext('2d');
+    x.imageSmoothingQuality = 'high';
+    x.translate(c.width / 2, c.height / 2);
+    x.rotate(putar * Math.PI / 180);
+    x.drawImage(img, -sw / 2, -sh / 2, sw, sh);
+    return c;
+  }
+
+  // Tingkat terang kertas = puncak histogram luminans di separuh terang (kertas adalah bidang terluas).
+  function ukurKertas(d) {
+    var hist = new Array(256).fill(0), i, n = d.length / 4;
+    for (i = 0; i < d.length; i += 4) hist[Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2])]++;
+    var puncak = 255, terbanyak = -1;
+    for (var v = 128; v < 256; v++) {
+      var jml = 0;
+      for (var k = Math.max(128, v - 2); k <= Math.min(255, v + 2); k++) jml += hist[k];
+      if (jml > terbanyak) { terbanyak = jml; puncak = v; }
+    }
+    if (terbanyak < n * 0.05) puncak = 255;   // tidak ada bidang terang yang jelas: anggap putih murni
+    var r = 0, g = 0, b = 0, c = 0;
+    for (i = 0; i < d.length; i += 4) {
+      var L = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      if (Math.abs(L - puncak) <= 6) { r += d[i]; g += d[i + 1]; b += d[i + 2]; c++; }
+    }
+    return c ? {L: puncak, rgb: [r / c, g / c, b / c]} : {L: 255, rgb: [255, 255, 255]};
+  }
+
+  function olah(jenis) {
+    var st = keadaan[jenis];
+    if (!st || st.memuat) return;
+    var nomor = ++st.nomor;
+    st.proses = true;
+    var c = kanvasKerja(st.img, st.putar), x = c.getContext('2d');
+    var data = x.getImageData(0, 0, c.width, c.height), d = data.data, i;
+    var hapusLatar = $(jenis + 'Latar').checked;
+    var peka = parseInt($(jenis + 'Peka').value, 10) || 0;
+    // Piksel tembus pandang dari PNG asli: tumpuk dulu di atas putih, supaya dinilai seperti kertas.
+    for (i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 255) {
+        var a0 = d[i + 3] / 255;
+        d[i] = d[i] * a0 + 255 * (1 - a0); d[i + 1] = d[i + 1] * a0 + 255 * (1 - a0); d[i + 2] = d[i + 2] * a0 + 255 * (1 - a0);
+        d[i + 3] = 255;
+      }
+    }
+    var kertas = ukurKertas(d);
+    var atas = Math.min(250, kertas.L - 22 - peka), bawah = atas - 70;   // > atas: kertas, < bawah: tinta penuh
+    var P = kertas.rgb, warna = WARNA[$(jenis + 'Warna').value];
+    var x0 = c.width, y0 = c.height, x1 = -1, y1 = -1, w = c.width;
+    for (i = 0; i < d.length; i += 4) {
+      var L = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      var a = (atas - L) / (atas - bawah);
+      a = a <= 0 ? 0 : (a >= 1 ? 1 : a);
+      if (hapusLatar) {
+        if (a === 0) { d[i + 3] = 0; continue; }
+        // Warna tinta asli: piksel = a*tinta + (1-a)*kertas, jadi tinta = (piksel - (1-a)*kertas) / a.
+        for (var k = 0; k < 3; k++) {
+          var t = (d[i + k] - (1 - a) * P[k]) / a;
+          d[i + k] = t < 0 ? 0 : (t > 255 ? 255 : t);
+        }
+        d[i + 3] = Math.round(a * 255);
+      }
+      if (warna && (!hapusLatar || a > 0)) {
+        if (hapusLatar) { d[i] = warna[0]; d[i + 1] = warna[1]; d[i + 2] = warna[2]; }
+        else if (a > 0) {   // latar dipertahankan: campur warna tinta pilihan dengan putih
+          d[i] = 255 - a * (255 - warna[0]); d[i + 1] = 255 - a * (255 - warna[1]); d[i + 2] = 255 - a * (255 - warna[2]);
+        }
+      }
+      if (a > 0.08) {   // batas potong: tinta yang cukup pekat
+        var p = i / 4, px = p % w, py = (p - px) / w;
+        if (px < x0) x0 = px; if (px > x1) x1 = px; if (py < y0) y0 = py; if (py > y1) y1 = py;
+      }
+    }
+    if (x1 < 0) {
+      st.proses = false; st.hasil = null;
+      $(jenis + 'Hasil').hidden = true; $(jenis + 'HasilKosong').hidden = false;
+      $(jenis + 'HasilKosong').textContent = 'Tidak ada goresan';
+      info(jenis, 'Tidak ada goresan yang terbaca. Geser Kepekaan ke kiri, atau pakai foto yang lebih jelas.', true);
+      pasangBerkas(jenis); perbaruiContoh(); return;
+    }
+    x.putImageData(data, 0, 0);
+    var pad = Math.max(4, Math.round(Math.max(x1 - x0, y1 - y0) * 0.03));
+    x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad);
+    x1 = Math.min(c.width - 1, x1 + pad); y1 = Math.min(c.height - 1, y1 + pad);
+    var pw = x1 - x0 + 1, ph = y1 - y0 + 1;
+    simpanPng(jenis, st, nomor, c, x0, y0, pw, ph, Math.min(1, MAKS_SISI[jenis] / Math.max(pw, ph)));
+  }
+
+  function simpanPng(jenis, st, nomor, c, x0, y0, pw, ph, skala) {
+    // Diperkecil bertahap (paling banyak separuh per langkah) supaya goresan tipis tidak bergerigi.
+    var sumber = c, sx = x0, sy = y0, sw = pw, sh = ph;
+    var tw = Math.max(1, Math.round(pw * skala)), th = Math.max(1, Math.round(ph * skala));
+    while (sw / 2 > tw) {
+      var t = document.createElement('canvas'); t.width = Math.round(sw / 2); t.height = Math.round(sh / 2);
+      var tx = t.getContext('2d'); tx.imageSmoothingQuality = 'high';
+      tx.drawImage(sumber, sx, sy, sw, sh, 0, 0, t.width, t.height);
+      sumber = t; sx = 0; sy = 0; sw = t.width; sh = t.height;
+    }
+    var o = document.createElement('canvas'); o.width = tw; o.height = th;
+    var ox = o.getContext('2d'); ox.imageSmoothingQuality = 'high';
+    ox.drawImage(sumber, sx, sy, sw, sh, 0, 0, tw, th);
+    o.toBlob(function (blob) {
+      // Gambar ini sudah dibatalkan / diganti, atau sudah ada olahan yang lebih baru untuk gambar yang sama.
+      if (keadaan[jenis] !== st || nomor !== st.nomor) return;
+      if (!blob) { st.proses = false; info(jenis, 'Browser gagal membuat PNG. Coba browser lain.', true); return; }
+      if (blob.size > MAKS_HASIL && skala > 0.2) {
+        simpanPng(jenis, st, nomor, c, x0, y0, pw, ph, skala * 0.8); return;
+      }
+      st.hasil = blob; st.proses = false;
+      if (st.url) URL.revokeObjectURL(st.url);
+      st.url = URL.createObjectURL(blob);
+      $(jenis + 'Hasil').src = st.url; $(jenis + 'Hasil').hidden = false; $(jenis + 'HasilKosong').hidden = true;
+      var catatan = tw + ' x ' + th + ' piksel, PNG ' + kb(blob.size) + '.';
+      if (Math.max(tw, th) < 300) catatan += ' Resolusi rendah, hasil cetak bisa pecah.';
+      if (!$(jenis + 'Latar').checked) catatan += ' Latar tidak dihapus: kotak latarnya akan menutupi tanda tangan atau stempel di dokumen.';
+      info(jenis, catatan, Math.max(tw, th) < 300);
+      pasangBerkas(jenis);
+      perbaruiContoh();
+    }, 'image/png');
+  }
+
+  // Isi input berkas dengan hasil olahan. Browser lama tanpa DataTransfer: berkas asli yang terkirim.
+  function pasangBerkas(jenis) {
+    var st = keadaan[jenis], inp = $(jenis + 'File');
+    if (!st || !bisaGanti) return;
+    var dt = new DataTransfer();
+    if (st.hasil) dt.items.add(new File([st.hasil], jenis + '.png', {type: 'image/png'}));
+    inp.files = dt.files;
+  }
+
+  function batal(jenis) {
+    var st = keadaan[jenis];
+    if (st && st.url) URL.revokeObjectURL(st.url);
+    keadaan[jenis] = null;
+    $(jenis + 'File').value = '';
+    $(jenis + 'Olah').hidden = true;
+    $(jenis + 'Hasil').hidden = true; $(jenis + 'Hasil').removeAttribute('src');
+    $(jenis + 'HasilKosong').hidden = false; $(jenis + 'HasilKosong').textContent = 'Pilih berkas di bawah';
+    info(jenis, '');
+    perbaruiContoh();
+  }
+
+  function pilihBerkas(jenis, f) {
+    if (!f) { batal(jenis); return; }
+    if (['image/png', 'image/jpeg', 'image/webp'].indexOf(f.type) < 0) {
+      batal(jenis);
+      info(jenis, 'Format ' + (f.type || 'berkas ini') + ' tidak didukung. Pakai PNG, JPG, atau WEBP.', true); return;
+    }
+    if (f.size > MAKS_ASLI) {
+      batal(jenis); info(jenis, 'Berkas ' + kb(f.size) + ' terlalu besar (maksimal 25 MB).', true); return;
+    }
+    var lama = keadaan[jenis];
+    if (lama && lama.url) URL.revokeObjectURL(lama.url);
+    // Langsung ditandai sedang dimuat: Simpan ditahan sampai hasil olahan siap (berkas asli tidak terkirim diam-diam).
+    var st = keadaan[jenis] = {memuat: true, img: null, putar: 0, asli: f, hasil: null, url: null, nomor: 0, proses: false};
+    info(jenis, 'Membaca gambar...');
+    var img = new Image(), url = URL.createObjectURL(f);
+    img.onload = function () {
+      URL.revokeObjectURL(url);
+      if (keadaan[jenis] !== st) return;   // dibatalkan atau diganti berkas lain selagi dimuat
+      st.memuat = false; st.img = img;
+      $(jenis + 'Olah').hidden = false;
+      var hapus = $(jenis + 'Hapus'); if (hapus) hapus.checked = false;
+      if (!bisaGanti) info(jenis, 'Browser ini tidak bisa mengirim hasil olahan; berkas asli yang dikirim (maksimal 1,5 MB).');
+      olah(jenis);
+    };
+    img.onerror = function () {
+      URL.revokeObjectURL(url);
+      if (keadaan[jenis] !== st) return;
+      batal(jenis);
+      info(jenis, 'Gambar tidak bisa dibaca. Berkasnya mungkin rusak atau bukan gambar.', true);
+    };
+    img.src = url;
+  }
+
+  // Ukuran & geseran stempel di contoh: rumus sama dengan _ttd_stempel_geometri di app.py.
+  function ukurStempel() {
+    var cSt = $('cStempel'), cTtd = $('cTtd');
+    var pilih = document.querySelector('input[name=stempel_ukuran]:checked');
+    var mm = pilih ? parseFloat(pilih.dataset.mm) : 28;
+    var nw = cSt.naturalWidth, nh = cSt.naturalHeight, w = null, h = mm;
+    if (nw > 0 && nh > 0) { var rasio = nw / nh; w = Math.min(mm * rasio, KOLOM_MM); h = w / rasio; }
+    var geser = Math.max(0, Math.min(0.38 * h, (KOLOM_MM - (w || Math.min(h, KOLOM_MM))) / 2));
+    if (w) { cSt.style.width = w + 'mm'; cSt.style.height = h + 'mm'; cSt.style.maxWidth = ''; cSt.style.maxHeight = ''; }
+    else { cSt.style.width = 'auto'; cSt.style.height = 'auto'; cSt.style.maxHeight = h + 'mm'; cSt.style.maxWidth = KOLOM_MM + 'mm'; }
+    cSt.style.transform = 'translateX(' + (cTtd.hidden ? '0' : '-' + geser + 'mm') + ')';
+    cSt.classList.toggle('ttd-sendiri', cTtd.hidden);
+  }
+
+  function perbaruiContoh() {
+    ['ttd', 'stempel'].forEach(function (jenis) {
+      var el = jenis === 'ttd' ? $('cTtd') : $('cStempel'), st = keadaan[jenis], hapus = $(jenis + 'Hapus');
+      if (!('awal' in el.dataset)) el.dataset.awal = el.getAttribute('src') || '';   // gambar tersimpan
+      var src = st && st.url ? st.url : (hapus && hapus.checked ? '' : el.dataset.awal);
+      if (src) { if (el.getAttribute('src') !== src) el.src = src; el.hidden = false; } else { el.hidden = true; }
+    });
+    ukurStempel();
+    var nama = $('ttdNama').value.trim(), jab = $('ttdJabatan').value.trim();
+    $('cNama').textContent = nama; $('cNama').hidden = !nama;
+    $('cJabatan').textContent = jab; $('cJabatan').hidden = !jab;
+  }
+
+  var tunda = {};
+  document.querySelectorAll('.ttd-file').forEach(function (inp) {
+    inp.addEventListener('change', function () { pilihBerkas(inp.dataset.jenis, inp.files[0]); });
+  });
+  document.querySelectorAll('.ttd-ubah').forEach(function (el) {
+    var jenis = el.id.indexOf('stempel') === 0 ? 'stempel' : 'ttd';
+    function ubah() {
+      $(jenis + 'PekaBaris').style.opacity = $(jenis + 'Latar').checked ? 1 : .4;
+      if (keadaan[jenis] && !keadaan[jenis].memuat) keadaan[jenis].proses = true;   // Simpan menunggu olahan baru
+      clearTimeout(tunda[jenis]); tunda[jenis] = setTimeout(function () { olah(jenis); }, 120);
+    }
+    el.addEventListener('input', ubah);
+    el.addEventListener('change', ubah);
+  });
+  document.querySelectorAll('[data-reset]').forEach(function (b) {
+    b.addEventListener('click', function () { var el = $(b.dataset.reset); el.value = 0; el.dispatchEvent(new Event('input')); });
+  });
+  document.querySelectorAll('[data-putar]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var st = keadaan[b.dataset.putar]; if (!st || st.memuat) return;
+      st.putar = (st.putar + 90) % 360; olah(b.dataset.putar);
+    });
+  });
+  document.querySelectorAll('[data-batal]').forEach(function (b) {
+    b.addEventListener('click', function () { batal(b.dataset.batal); });
+  });
+  document.querySelectorAll('.ttd-ubah-teks').forEach(function (el) {
+    el.addEventListener('input', perbaruiContoh);
+    el.addEventListener('change', perbaruiContoh);
+  });
+  ['ttdHapus', 'stempelHapus'].forEach(function (id) { if ($(id)) $(id).addEventListener('change', perbaruiContoh); });
+  ['cTtd', 'cStempel'].forEach(function (id) { $(id).addEventListener('load', ukurStempel); });
+
+  function namaJenis(j) { return j === 'ttd' ? 'tanda tangan' : 'stempel'; }
+  $('ttdForm').addEventListener('submit', function (e) {
+    var jalan = ['ttd', 'stempel'].filter(function (j) { return keadaan[j] && (keadaan[j].memuat || keadaan[j].proses); });
+    // Gambar yang dipilih tapi tidak menghasilkan goresan: jangan kirim berkas asli diam-diam.
+    var gagal = ['ttd', 'stempel'].filter(function (j) {
+      return keadaan[j] && !keadaan[j].memuat && !keadaan[j].proses && !keadaan[j].hasil && bisaGanti;
+    });
+    var pesan = jalan.length ? 'Gambar ' + jalan.map(namaJenis).join(' dan ') + ' masih diolah. Tunggu sebentar lalu tekan Simpan lagi.'
+      : gagal.length ? 'Gambar ' + gagal.map(namaJenis).join(' dan ') + ' belum terbaca. Atur Kepekaan atau tekan Batal pilih.' : '';
+    if (pesan) {
+      e.preventDefault();
+      $('ttdStatus').textContent = pesan;
+      $('ttdStatus').classList.add('galat');
+      return;
+    }
+    $('ttdSimpan').disabled = true;
+    $('ttdStatus').classList.remove('galat');
+    $('ttdStatus').textContent = 'Menyimpan...';
+  });
+  perbaruiContoh();
+})();
+</script>
+{% endblock %}

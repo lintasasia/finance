@@ -1,0 +1,100 @@
+{# Pengaturan printer struk untuk PERANGKAT INI. Disimpan di browser perangkat (bukan di
+   server), karena printer Bluetooth tersambung ke tablet/HP/komputer tertentu.
+   Dipakai di layar kasir dan halaman struk; logikanya di static/pos_printer.js. #}
+{% set _kertas = (pos_s.pos_struk_kertas if pos_s else '80') or '80' %}
+<style>
+#printerModal .prn-opsi{display:flex;gap:12px;align-items:flex-start;border:1.5px solid #0A0A0A;padding:12px 14px;margin:0 0 10px;cursor:pointer;background:#fff;font-weight:400}
+#printerModal .prn-opsi.aktif{background:#F4F4F2;box-shadow:inset 0 0 0 1.5px #0A0A0A}
+#printerModal .prn-opsi input,#printerModal .prn-cek input{flex-shrink:0;width:18px;height:18px;margin-top:2px;accent-color:#0A0A0A}
+#printerModal .prn-judul{display:block;font-weight:700;font-size:15px;line-height:1.3;color:#0A0A0A}
+#printerModal .prn-ket{display:block;font-size:13px;line-height:1.45;color:#3d3d3d;margin-top:2px}
+#printerModal .prn-bagian{margin-top:18px}
+#printerModal .prn-label{display:block;font-weight:700;font-size:13px;letter-spacing:.02em;margin-bottom:6px;color:#0A0A0A}
+#printerModal .prn-cek{display:flex;gap:10px;align-items:flex-start;cursor:pointer;font-weight:400}
+#printerModal .prn-status{font-size:13px;line-height:1.45;padding:9px 12px;margin-top:14px;background:#F4F4F2;border:1px solid rgba(10,10,10,.18);color:#0A0A0A}
+#printerModal .prn-status.ok{background:#ecfdf3;border-color:#15803d;color:#14532d}
+#printerModal .prn-status.galat{background:#fef2f2;border-color:#b91c1c;color:#7f1d1d}
+#printerModal .prn-status.proses{background:#fffbeb;border-color:#b45309;color:#78350f}
+#printerModal .form-select{border:1.5px solid #0A0A0A;border-radius:0!important;font-size:14px}
+#printerModal .modal-footer{justify-content:space-between}
+/* Tombol Printer di bar atas kasir saat Bluetooth langsung dipilih tapi printer belum tersambung. */
+.cb-pill.prn-belum{background:#fffbeb;border-color:#b45309;color:#78350f}
+</style>
+<div class="modal fade no-print" id="printerModal" tabindex="-1" aria-labelledby="printerModalJudul" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="printerModalJudul">Printer struk</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+      </div>
+      <div class="modal-body">
+        <p class="prn-ket" style="margin:0 0 14px">Setelan ini hanya berlaku di perangkat ini. Tablet atau komputer kasir lain mengatur printernya sendiri.</p>
+
+        <label class="prn-opsi">
+          <input type="radio" name="prnMetode" value="dialog">
+          <span>
+            <span class="prn-judul">Jendela cetak browser</span>
+            <span class="prn-ket">Seperti biasa: printer dipilih di jendela cetak. Cocok untuk komputer yang printernya sudah terpasang driver.</span>
+          </span>
+        </label>
+        <label class="prn-opsi">
+          <input type="radio" name="prnMetode" value="bluetooth">
+          <span>
+            <span class="prn-judul">Bluetooth langsung</span>
+            <span class="prn-ket">Struk langsung keluar tanpa jendela cetak. Butuh Chrome atau Edge (Android, Windows, Mac) dan printer thermal Bluetooth yang mendukung BLE.</span>
+          </span>
+        </label>
+        <label class="prn-opsi">
+          <input type="radio" name="prnMetode" value="rawbt">
+          <span>
+            <span class="prn-judul">Lewat aplikasi RawBT (Android)</span>
+            <span class="prn-ket">Untuk printer Bluetooth yang tidak bisa disambung langsung. Pasang RawBT dari Play Store dan sambungkan printernya di aplikasi itu, struk lalu diteruskan ke sana.</span>
+          </span>
+        </label>
+
+        <div id="prnBagianBt" class="prn-bagian" style="display:none">
+          <span class="prn-label">Printer Bluetooth</span>
+          <span id="prnBtNama" class="prn-ket">Belum ada printer yang dipilih.</span>
+          <div class="d-flex gap-2 flex-wrap mt-2">
+            <button type="button" class="btn btn-sm btn-dark" id="prnBtCari">Cari printer</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="prnBtLupa" style="display:none">Lupakan printer</button>
+          </div>
+          <div id="prnBtTakDidukung" class="prn-status galat" style="display:none">Browser ini belum bisa menyambung printer Bluetooth. Pakai Chrome atau Edge di Android, Windows, atau Mac lewat alamat https. iPhone dan iPad belum didukung. Untuk printer Bluetooth biasa di Android, pilih cara RawBT.</div>
+        </div>
+
+        <div id="prnBagianKolom" class="prn-bagian" style="display:none">
+          <label class="prn-label" for="prnKolom">Karakter per baris</label>
+          <select id="prnKolom" class="form-select form-select-sm">
+            <option value="auto">Ikut ukuran kertas di Pengaturan ({{ _kertas }} mm, {{ 32 if _kertas == '58' else 48 }} karakter)</option>
+            <option value="32">32 karakter (kertas 58 mm)</option>
+            <option value="42">42 karakter (kertas 80 mm, huruf lebih besar)</option>
+            <option value="48">48 karakter (kertas 80 mm)</option>
+          </select>
+          <span class="prn-ket mt-1">Pakai Tes cetak untuk memastikan satu baris pas selebar kertas.</span>
+        </div>
+
+        <div class="prn-bagian">
+          <label class="prn-cek">
+            <input type="checkbox" id="prnOtomatis">
+            <span>
+              <span class="prn-judul" style="font-size:14px">Cetak otomatis setiap transaksi selesai</span>
+              <span class="prn-ket">Struk langsung dicetak begitu halaman struk terbuka. Cara RawBT tetap perlu menekan tombol Cetak.</span>
+            </span>
+          </label>
+        </div>
+
+        <div id="prnStatus" class="prn-status" style="display:none" role="status" aria-live="polite"></div>
+
+        <div class="prn-bagian">
+          <span class="prn-label">Aplikasi kasir</span>
+          <span id="prnPasangKet" class="prn-ket"></span>
+          <button type="button" class="btn btn-sm btn-dark mt-2" id="prnPasang" style="display:none">Pasang di layar utama</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-dark" id="prnTes" style="display:none">Tes cetak</button>
+        <button type="button" class="btn btn-dark ms-auto" data-bs-dismiss="modal">Selesai</button>
+      </div>
+    </div>
+  </div>
+</div>

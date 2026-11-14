@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}PPh Final UMKM {{ tahun }} - FinansialApp{% endblock %}
+{% block page_title %}<i class="fas fa-store text-success me-2"></i>PPh Final UMKM{% endblock %}
+{% block content %}
+
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+  <a href="/pajak" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Hub Pajak</a>
+  <div class="btn-group btn-group-sm" role="group" aria-label="Pindah tahun">
+    <a class="btn btn-outline-secondary" href="{{ url_for('pajak_pph_umkm', tahun=tahun - 1) }}" aria-label="Tahun sebelumnya"><i class="fas fa-chevron-left"></i></a>
+    <span class="btn btn-outline-secondary disabled fw-semibold">{{ tahun }}</span>
+    <a class="btn btn-outline-secondary" href="{{ url_for('pajak_pph_umkm', tahun=tahun + 1) }}" aria-label="Tahun berikutnya"><i class="fas fa-chevron-right"></i></a>
+  </div>
+  <a href="{{ url_for('pajak_pph_rekap') }}" class="btn btn-outline-primary btn-sm ms-auto"><i class="fas fa-table-list me-1"></i>Rekap PPh Bulanan</a>
+</div>
+
+<div class="alert alert-info py-2 mb-3" style="font-size:.82rem">
+  <i class="fas fa-circle-info me-1"></i>
+  PPh final {{ setelan.tarif|qty }}% dari omzet bruto (PP 55/2022 sebagaimana diubah PP 20/2026) yang Anda setor
+  sendiri tiap bulan. Omzet dibaca dari akun pendapatan bersubtipe <strong>Pendapatan Usaha</strong> dan dihitung
+  sebelum diskon penjualan; retur penjualan mengurangi omzet. Penghasilan yang kena PPh final lain (sewa
+  tanah/bangunan, jasa konstruksi, dan sejenisnya) tidak dihitung, dan omzet yang PPh final UMKM-nya sudah dipotong
+  pembeli tidak disetor lagi.
+  {% if setelan.jenis_wp == 'OP' %}Untuk orang pribadi, {{ batas_op|rp }} pertama dari seluruh omzet setahun tidak dikenai PPh.{% endif %}
+  Batas {{ batas_omzet|rp }} setahun dihitung dari seluruh omzet, termasuk usaha pasangan dan pekerjaan bebas; aplikasi
+  ini hanya melihat data usaha ini.
+</div>
+
+{% if setelan.jenis_wp == 'BADAN' %}
+<div class="alert alert-warning py-2 mb-3" style="font-size:.82rem">
+  <i class="fas fa-triangle-exclamation me-1"></i>
+  Sejak PP 20/2026 (22 April 2026) CV, firma, PT, dan BUMDes tidak bisa lagi memakai tarif ini, kecuali yang sudah
+  memakainya sebelum tanggal itu, sampai jangka waktunya habis. Kalau usaha Anda koperasi atau PT Perorangan, ganti
+  pilihan Wajib pajak di Setelan.
+</div>
+{% endif %}
+{% if total.omzet > batas_omzet %}
+<div class="alert alert-warning py-2 mb-3" style="font-size:.82rem">
+  <i class="fas fa-triangle-exclamation me-1"></i>
+  Omzet {{ tahun }} sudah {{ total.omzet|rp }}, melewati {{ batas_omzet|rp }}. Tarif {{ setelan.tarif|qty }}% tetap
+  dipakai sampai akhir tahun ini; mulai tahun pajak berikutnya usaha ini memakai tarif PPh umum.
+</div>
+{% elif total.omzet > batas_omzet * 0.8 %}
+<div class="alert alert-light border py-2 mb-3" style="font-size:.82rem">
+  <i class="fas fa-circle-info me-1"></i>Omzet {{ tahun }} sudah {{ total.omzet|rp }}, mendekati batas {{ batas_omzet|rp }} setahun.
+</div>
+{% endif %}
+
+{% if not setelan.aktif %}
+<div class="alert alert-warning py-2 mb-3" style="font-size:.82rem">
+  <i class="fas fa-toggle-off me-1"></i>
+  Belum diaktifkan. Hitungan di bawah hanya simulasi; centang <strong>Usaha ini memakai PPh final UMKM</strong> supaya bisa dicatat dan ikut tampil di Rekap PPh.
+</div>
+{% endif %}
+
+<div class="card mb-3">
+  <div class="card-header py-2 d-flex flex-wrap align-items-center gap-2">
+    <span class="fw-semibold" style="font-size:.88rem">Perhitungan {{ tahun }}</span>
+    <span class="ms-auto small">Saldo hutang PPh final UMKM (2122):
+      <strong class="{{ 'text-danger' if saldo_hutang > 0.5 else '' }}">{{ saldo_hutang|rp }}</strong>
+      {% if saldo_hutang > 0.5 %}<a href="/pajak/setor" class="ms-1">Setor</a>{% endif %}</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm mb-0 align-middle" style="font-size:.84rem">
+        <thead class="table-light"><tr>
+          <th class="ps-3">Bulan</th>
+          <th class="text-end">Omzet Bruto</th>
+          {% if setelan.jenis_wp == 'OP' %}<th class="text-end">Kumulatif</th>{% endif %}
+          <th class="text-end">Dikenai</th>
+          <th class="text-end">Sudah Dipotong Pembeli</th>
+          <th class="text-end">Dasar Setor Sendiri</th>
+          <th class="text-end">PPh Final</th>
+          <th class="pe-3">Status</th>
+        </tr></thead>
+        <tbody>
+          {% for x in data %}
+          <tr class="{{ 'text-muted' if x.mendatang else '' }}">
+            <td class="ps-3">{{ x.nama }}</td>
+            <td class="text-end text-nowrap">{{ x.omzet|rp }}
+              {% if x.diskon or x.final_lain %}<div class="small text-muted">{% if x.diskon %}termasuk diskon {{ x.diskon|rp }}{% endif %}{% if x.diskon and x.final_lain %}, {% endif %}{% if x.final_lain %}tanpa PPh final lain {{ x.final_lain|rp }}{% endif %}</div>{% endif %}</td>
+            {% if setelan.jenis_wp == 'OP' %}<td class="text-end text-nowrap">{{ x.kumulatif|rp }}</td>{% endif %}
+            <td class="text-end text-nowrap">{{ x.kena|rp }}</td>
+            <td class="text-end text-nowrap">{{ x.sudah_final|rp if x.sudah_final else '-' }}</td>
+            <td class="text-end text-nowrap">{{ x.dasar|rp }}</td>
+            <td class="text-end fw-semibold text-nowrap">{{ x.pph|rp }}</td>
+            <td class="pe-3">
+              {% if x.tercatat %}
+                {% for t in x.tercatat %}
+                <a href="/transaksi/{{ t.jurnal_id }}" class="text-nowrap"><i class="fas fa-check text-success me-1"></i>{{ t.nomor_tx or ('#' ~ t.jurnal_id) }}</a>
+                <span class="text-nowrap">{{ t.nominal|rp }}</span>
+                {% endfor %}
+                {% if (x.pph - x.nominal_tercatat)|abs > 0.5 %}
+                <div class="small text-warning">Hitungan sekarang beda {{ (x.pph - x.nominal_tercatat)|rp }}. Hapus jurnalnya lalu catat ulang bila perlu.</div>
+                {% endif %}
+              {% elif x.mendatang %}
+                <span class="small">Belum berjalan</span>
+              {% elif not x.selesai %}
+                <span class="small">Bulan berjalan, catat sesudah akhir bulan</span>
+              {% elif x.pph > 0 and setelan.aktif %}
+                <form method="POST" class="d-inline">
+                  <input type="hidden" name="aksi" value="catat">
+                  <input type="hidden" name="tahun" value="{{ tahun }}">
+                  <input type="hidden" name="bulan" value="{{ x.bulan }}">
+                  <button type="submit" class="btn btn-sm btn-success"
+                          onclick="return confirm('Catat PPh final UMKM {{ x.nama }} {{ tahun }} sebagai hutang pajak?')">
+                    <i class="fas fa-file-circle-plus me-1"></i>Catat</button>
+                </form>
+              {% elif x.pph > 0 %}
+                <span class="small text-muted">Aktifkan dulu</span>
+              {% else %}
+                <span class="small text-muted">Tidak terutang</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot><tr class="fw-bold">
+          <td class="ps-3">Jumlah</td>
+          <td class="text-end text-nowrap">{{ total.omzet|rp }}</td>
+          {% if setelan.jenis_wp == 'OP' %}<td></td>{% endif %}
+          <td class="text-end text-nowrap">{{ total.kena|rp }}</td>
+          <td class="text-end text-nowrap">{{ total.sudah_final|rp }}</td>
+          <td class="text-end text-nowrap">{{ total.dasar|rp }}</td>
+          <td class="text-end text-nowrap">{{ total.pph|rp }}</td>
+          <td class="pe-3 text-nowrap">Tercatat {{ total.nominal_tercatat|rp }}</td>
+        </tr></tfoot>
+      </table>
+    </div>
+  </div>
+  <div class="card-footer small text-muted">
+    <strong>Catat</strong> membuat jurnal Dr 6171 Beban PPh Final / Cr 2122 Hutang PPh Final UMKM. Setelah menyetor
+    (umumnya paling lambat tanggal 15 bulan berikutnya), catat pembayarannya lewat <a href="/pajak/setor">Bayar Pajak/Gaji</a>
+    dengan akun 2122.
+  </div>
+</div>
+
+<form method="POST" class="card mb-3">
+  <input type="hidden" name="aksi" value="setelan">
+  <input type="hidden" name="tahun" value="{{ tahun }}">
+  <div class="card-header py-2 fw-semibold" style="font-size:.88rem"><i class="fas fa-sliders me-2 text-muted"></i>Setelan</div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="form-check form-switch mt-md-4">
+          <input class="form-check-input" type="checkbox" name="aktif" value="1" id="umkm_aktif" {% if setelan.aktif %}checked{% endif %}>
+          <label class="form-check-label small fw-semibold" for="umkm_aktif">Usaha ini memakai PPh final UMKM</label>
+        </div>
+      </div>
+      <div class="col-md-5">
+        <label class="form-label small fw-semibold" for="umkm_jenis">Wajib pajak</label>
+        <select name="jenis_wp" id="umkm_jenis" class="form-select form-select-sm"
+                onchange="document.getElementById('umkm_jenis_info').textContent = this.options[this.selectedIndex].getAttribute('data-uraian') || ''">
+          {% for k, label, uraian in jenis_wp_list %}
+          <option value="{{ k }}" data-uraian="{{ uraian }}" {% if setelan.jenis_wp == k %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text" id="umkm_jenis_info" style="font-size:.72rem">{% for k, label, uraian in jenis_wp_list %}{% if k == setelan.jenis_wp %}{{ uraian }}{% endif %}{% endfor %}</div>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold" for="umkm_tarif">Tarif</label>
+        <div class="input-group input-group-sm">
+          <input type="number" name="tarif" id="umkm_tarif" class="form-control" min="0" max="100" step="0.01" value="{{ setelan.tarif|inputnum }}">
+          <span class="input-group-text">%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card-footer">
+    <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-save me-1"></i>Simpan Setelan</button>
+  </div>
+</form>
+{% endblock %}

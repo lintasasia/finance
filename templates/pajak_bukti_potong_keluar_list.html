@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+{% block title %}Bukti Potong Keluar{% endblock %}
+{% block content %}
+{% from '_pagination.html' import pagination with context %}
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+  <a href="/pajak" class="btn btn-sm btn-outline-secondary" aria-label="Kembali ke Hub Pajak"><i class="fas fa-arrow-left"></i></a>
+  <h4 class="mb-0"><i class="fas fa-scissors text-warning me-2"></i>Bukti Potong Keluar
+    <span class="badge bg-warning text-dark ms-1" style="font-size:.65rem"><i class="fas fa-puzzle-piece me-1"></i>Lanjutan</span>
+  </h4>
+  <a href="{{ url_for('pajak_pph_rekap') }}" class="btn btn-sm btn-outline-primary ms-auto"><i class="fas fa-table-list me-1"></i>Rekap PPh Bulanan</a>
+</div>
+
+<div class="alert alert-info py-2 small mb-3">
+  <i class="fas fa-circle-info me-1"></i>
+  Transaksi di mana <strong>usaha Anda sebagai pemotong</strong> menahan PPh dari pembayaran ke supplier/vendor,
+  semua jenis (PPh 23, PPh 4 ayat (2), PPh 21, PPh 26, PPh 15, PPh 22). Lengkapi NPWP, kode objek pajak, dan nomor
+  bukti potong lewat <strong>Rincian</strong>; cetakannya bisa diserahkan ke supplier sebagai tanda terima.
+</div>
+
+{% if rows %}
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle small">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">No. Bukti</th>
+            <th>Tanggal</th>
+            <th>Supplier / Pihak</th>
+            <th>Jenis PPh</th>
+            <th class="text-end">DPP</th>
+            <th class="text-end">Tarif</th>
+            <th class="text-end">PPh Dipotong</th>
+            <th class="text-center pe-3">Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in rows %}
+          <tr>
+            <td class="ps-3">
+              <div style="font-family:monospace">{{ e.nomor_tampil }}</div>
+              {% if not e.nomor_bukti %}<div class="text-muted" style="font-size:.68rem">nomor arsip</div>{% endif %}
+            </td>
+            <td class="text-nowrap">{{ e.tanggal|tgl }}</td>
+            <td>
+              <div class="fw-semibold">{{ e.pihak or '-' }}</div>
+              {% if e.npwp %}<div class="text-muted">NPWP {{ e.npwp }}</div>{% else %}<div class="text-muted">NPWP belum diisi</div>{% endif %}
+            </td>
+            <td>
+              <span class="badge {{ 'bg-secondary' if e.final else 'bg-danger' }}">{{ e.label }}{% if e.final %} final{% endif %}</span>
+              {% if e.retur %}<span class="badge bg-warning text-dark">Retur</span>{% endif %}
+              <div class="text-muted">{{ e.uraian }}{% if e.kode_objek %} &middot; {{ e.kode_objek }}{% endif %}</div>
+            </td>
+            <td class="text-end text-rp text-nowrap">{{ e.dpp|rp if e.dpp is not none else '-' }}</td>
+            <td class="text-end text-nowrap">{{ (e.tarif|qty ~ '%') if e.tarif else '-' }}</td>
+            <td class="text-end fw-semibold text-danger text-rp text-nowrap">{{ e.pph|rp }}</td>
+            <td class="text-center pe-3 text-nowrap">
+              <a href="{{ url_for('pajak_pph_rincian', jurnal_id=e.jurnal_id, slot=e.slot, next=request.full_path) }}"
+                 class="btn btn-sm btn-outline-primary"><i class="fas fa-pen-to-square me-1"></i>Rincian</a>
+              {% if not e.retur %}
+              <a href="/pajak/bukti-potong-keluar/{{ e.jurnal_id }}/cetak" target="_blank"
+                 class="btn btn-sm btn-outline-secondary"><i class="fas fa-print me-1"></i>Cetak</a>
+              {% endif %}
+              <a href="/transaksi/{{ e.jurnal_id }}" class="btn btn-sm btn-outline-secondary" title="Lihat transaksi"
+                 aria-label="Lihat transaksi"><i class="fas fa-eye"></i></a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="text-center text-muted py-5">
+  <i class="fas fa-scissors fa-3x mb-3 opacity-25"></i>
+  <p class="mb-1">Belum ada transaksi dengan pemotongan PPh ke supplier.</p>
+  <p class="small">Gunakan <a href="/pajak/pembelian-pkp">Pembelian PKP</a>, atau aktifkan bagian Pajak di form
+    <a href="/pengeluaran">Pengeluaran</a> / <a href="/pembelian">Pembelian</a> lalu pilih jenis PPh yang Anda potong.</p>
+</div>
+{% endif %}
+{{ pagination(pg) }}
+{% endblock %}

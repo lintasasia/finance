@@ -1,0 +1,28 @@
+# Virtual Environment
+venv/
+env/
+.env
+
+# Python Bytecode & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Runtime & Process IDs
+*.pid
+*.log
+error.log
+
+# Application Secrets & Local Database
+.secret_key
+finansial.db
+finansial.db*
+*.sqlite3
+*.db
+
+# Uploads
+uploads/*
+!uploads/.gitkeep
+
+# SSL ACME Challenge
+.well-known/

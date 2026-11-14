@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Rincian {{ e.label }} - FinansialApp{% endblock %}
+{% block page_title %}<i class="fas fa-file-signature text-primary me-2"></i>Rincian Bukti Potong{% endblock %}
+{% block content %}
+{% import '_pph_isian.html' as pphf with context %}
+{{ pphf.skrip() }}
+
+<div class="row justify-content-center">
+<div class="col-lg-9">
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <a href="{{ kembali }}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Kembali</a>
+  <a href="/transaksi/{{ e.jurnal_id }}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-eye me-1"></i>Lihat transaksi</a>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header py-2 fw-semibold" style="font-size:.88rem">
+    {{ e.label }}{% if e.final %} <span class="badge bg-secondary">final</span>{% endif %}
+    {{ 'yang Anda potong' if e.sisi == 'BELI' else ('yang Anda setor sendiri' if e.sisi == 'SENDIRI' else 'yang dipotong pihak lain') }}
+    {% if e.retur %}<span class="badge bg-warning text-dark">Retur</span>{% endif %}
+  </div>
+  <div class="card-body py-2">
+    <div class="row g-2" style="font-size:.85rem">
+      <div class="col-6 col-md-3"><div class="text-muted small">Tanggal</div><div class="fw-semibold">{{ e.tanggal|tgl }}</div></div>
+      <div class="col-6 col-md-3"><div class="text-muted small">Transaksi</div><div class="fw-semibold">{{ e.nomor_tx or ('#' ~ e.jurnal_id) }}</div></div>
+      <div class="col-12 col-md-6"><div class="text-muted small">{{ 'Dipotong dari' if e.sisi == 'BELI' else ('Customer' if e.sisi == 'SENDIRI' else 'Pemotong') }}</div><div class="fw-semibold">{{ e.pihak or '-' }}</div></div>
+      <div class="col-6 col-md-3"><div class="text-muted small">DPP</div><div class="fw-semibold">{{ e.dpp|rp if e.dpp is not none else '-' }}</div></div>
+      <div class="col-6 col-md-3"><div class="text-muted small">Tarif</div><div class="fw-semibold">{{ (e.tarif|qty ~ '%') if e.tarif else '-' }}</div></div>
+      <div class="col-6 col-md-3"><div class="text-muted small">PPh</div><div class="fw-bold">{{ e.pph|rp }}</div></div>
+      <div class="col-6 col-md-3"><div class="text-muted small">Akun</div><div class="fw-semibold">{{ e.akun }}</div></div>
+    </div>
+    <div class="small text-muted mt-2">{{ e.keterangan }}</div>
+  </div>
+</div>
+
+<form method="POST" class="card">
+  <input type="hidden" name="next" value="{{ kembali }}">
+  <div class="card-body">
+    <label class="form-label small fw-semibold" for="r_pph_objek">Peruntukan</label>
+    {% if pilihan|length > 1 %}
+    <select name="objek" id="r_pph_objek" class="form-select form-select-sm pph-objek" data-idp="r_" data-tarif=""
+            data-sisi="{{ e.sisi }}" onchange="pphObjekBerubah(this)">
+      {% for o in pilihan %}
+      <option value="{{ o[0] }}" {% if o[0] == e.objek %}selected{% endif %}>{{ PPH_JENIS[o[1]].label }} &middot; {{ o[2] }}{% if o[3] %} &middot; {{ o[3]|qty }}%{% endif %}</option>
+      {% endfor %}
+    </select>
+    <div class="form-text" style="font-size:.72rem">Hanya peruntukan yang memakai akun yang sama. Mengganti jenis PPh
+      (misalnya PPh 23 menjadi PPh 4 ayat (2)) mengubah jurnal, jadi lakukan lewat tombol Edit Transaksi &amp; Item
+      di <a href="/transaksi/{{ e.jurnal_id }}">halaman transaksi</a>.</div>
+    {% else %}
+    <div class="fw-semibold" style="font-size:.88rem">{{ e.label }} &middot; {{ e.uraian }}</div>
+    <input type="hidden" name="objek" value="{{ e.objek }}">
+    {% endif %}
+
+    {{ pphf.rincian('pph_', 'r_', e, judul=('Rincian setoran (nomor bukti boleh diisi NTPN)' if e.sisi == 'SENDIRI' else ('Rincian bukti potong' if e.sisi == 'BELI' or e.slot == 'A' else 'Rincian bukti pungut')), buka=true) }}
+  </div>
+  <div class="card-footer d-flex gap-2">
+    <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-save me-1"></i>Simpan Rincian</button>
+    <a href="{{ kembali }}" class="btn btn-outline-secondary btn-sm">Batal</a>
+  </div>
+</form>
+
+</div>
+</div>
+{% endblock %}
