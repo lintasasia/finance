@@ -509,6 +509,117 @@
     </div>
   </div>
 
+  <!-- Konfigurasi Login OAuth (Single Sign-On) -->
+  <div class="col-12" id="oauth-config" style="scroll-margin-top:76px">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+          <i class="fab fa-google text-primary" style="font-size:1.1rem"></i>
+          <span class="section-title">Konfigurasi Login OAuth (Single Sign-On)</span>
+          {% if oauth_config.enabled == '1' %}
+            <span class="badge bg-success ms-2">Aktif</span>
+          {% else %}
+            <span class="badge bg-secondary ms-2">Nonaktif</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="card-body">
+        <form method="POST">
+          <input type="hidden" name="action" value="save_oauth">
+          <div class="row g-3">
+            <div class="col-12">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="oauth_enabled" name="oauth_enabled" value="1" {% if oauth_config.enabled == '1' %}checked{% endif %}>
+                <label class="form-check-label fw-semibold" for="oauth_enabled">
+                  Aktifkan Login dengan OAuth / Google
+                </label>
+                <div class="form-text">
+                  Jika aktif, tombol login OAuth akan muncul di halaman login. Pengguna dapat login langsung menggunakan akun Google/email mereka.
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label fw-semibold small">Provider OAuth</label>
+              <select name="oauth_provider" class="form-select form-select-sm">
+                <option value="google" {% if oauth_config.provider == 'google' %}selected{% endif %}>Google (Rekomendasi)</option>
+                <option value="microsoft" {% if oauth_config.provider == 'microsoft' %}selected{% endif %}>Microsoft (Office 365 / Azure AD)</option>
+                <option value="github" {% if oauth_config.provider == 'github' %}selected{% endif %}>GitHub</option>
+              </select>
+              <div class="form-text">Pilih penyedia autentikasi OAuth.</div>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label fw-semibold small">OAuth Client ID</label>
+              <input type="text" name="oauth_client_id" class="form-control form-control-sm font-monospace"
+                     value="{{ oauth_config.client_id }}" placeholder="misal: xxxxxxxx.apps.googleusercontent.com">
+              <div class="form-text">Client ID dari konsol OAuth provider.</div>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label fw-semibold small">OAuth Client Secret</label>
+              <input type="password" name="oauth_client_secret" class="form-control form-control-sm font-monospace"
+                     value="{{ oauth_config.client_secret }}" placeholder="Client Secret">
+              <div class="form-text">Rahasia client OAuth dari provider.</div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">Batasi Domain Email (Opsional)</label>
+              <input type="text" name="oauth_allowed_domain" class="form-control form-control-sm"
+                     value="{{ oauth_config.allowed_domain }}" placeholder="contoh: lintas.asia (pisahkan koma jika lebih)">
+              <div class="form-text">Kosongkan jika semua domain email diperbolehkan. Isi misal <code>lintas.asia</code> agar hanya email kantor yang diizinkan login.</div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">Registrasi Akun Baru Otomatis</label>
+              <div class="d-flex align-items-center gap-3">
+                <div class="form-check form-switch m-0">
+                  <input class="form-check-input" type="checkbox" id="oauth_auto_create" name="oauth_auto_create" value="1" {% if oauth_config.auto_create == '1' %}checked{% endif %}>
+                  <label class="form-check-label small" for="oauth_auto_create">Auto-create User Baru</label>
+                </div>
+                <div class="d-flex align-items-center gap-1 flex-grow-1">
+                  <span class="small text-muted text-nowrap">Role Default:</span>
+                  <select name="oauth_default_role" class="form-select form-select-sm" style="max-width:140px">
+                    <option value="KASIR" {% if oauth_config.default_role == 'KASIR' %}selected{% endif %}>KASIR</option>
+                    <option value="OPERATOR" {% if oauth_config.default_role == 'OPERATOR' %}selected{% endif %}>OPERATOR</option>
+                    <option value="INVESTOR" {% if oauth_config.default_role == 'INVESTOR' %}selected{% endif %}>INVESTOR</option>
+                    <option value="MANAJER" {% if oauth_config.default_role == 'MANAJER' %}selected{% endif %}>MANAJER</option>
+                    <option value="FINANCE" {% if oauth_config.default_role == 'FINANCE' %}selected{% endif %}>FINANCE</option>
+                    <option value="ADMIN" {% if oauth_config.default_role == 'ADMIN' %}selected{% endif %}>ADMIN</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-text">Jika nonaktif, hanya email yang sudah didaftarkan admin di tabel user yang dapat login.</div>
+            </div>
+
+            <div class="col-12">
+              <div class="alert alert-info py-2 px-3 mb-0" style="font-size:.82rem">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                  <div>
+                    <i class="fas fa-link me-1"></i><strong>Authorized Redirect URI / Callback URL:</strong>
+                    <code id="oauthCallbackUrl" class="user-select-all ms-1">{{ request.host_url.rstrip('/') }}/auth/google/callback</code>
+                  </div>
+                  <button type="button" class="btn btn-xs btn-outline-primary" onclick="navigator.clipboard.writeText(document.getElementById('oauthCallbackUrl').innerText);this.innerHTML='<i class=\'fas fa-check me-1\'></i>Tersalin';setTimeout(()=>this.innerHTML='<i class=\'fas fa-copy me-1\'></i>Salin URL',2000)">
+                    <i class="fas fa-copy me-1"></i>Salin URL
+                  </button>
+                </div>
+                <div class="text-muted mt-1" style="font-size:.75rem">
+                  Daftarkan URL di atas ke <strong>Authorized redirect URIs</strong> pada Google Cloud Console (Credentials → OAuth 2.0 Client IDs). <em>(Catatan: endpoint <code>/login/oauth/callback</code> juga didukung otomatis sebagai alternatif).</em>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-12 text-end">
+              <button type="submit" class="btn btn-primary btn-sm">
+                <i class="fas fa-save me-1"></i>Simpan Konfigurasi OAuth
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- Manajemen User -->
   <div class="col-12" id="manajemen-user" style="scroll-margin-top:76px">
     <div class="card">
@@ -648,6 +759,7 @@
             <tr>
               <th class="ps-3">Username</th>
               <th>Nama</th>
+              <th>Email</th>
               <th>Role</th>
               <th>Hak Akses</th>
               <th>Status</th>
@@ -659,6 +771,13 @@
             <tr>
               <td class="ps-3 fw-semibold">{{ u.username }}</td>
               <td style="font-size:.82rem">{{ u.nama or '-' }}</td>
+              <td style="font-size:.82rem">
+                {% if u.email %}
+                  <span class="text-dark">{{ u.email }}</span>
+                {% else %}
+                  <span class="text-muted fst-italic">-</span>
+                {% endif %}
+              </td>
               <td>
                 {% if u.role == 'ADMIN' %}
                   <span class="badge bg-primary">ADMIN</span>
@@ -727,6 +846,9 @@
                           data-bs-toggle="modal" data-bs-target="#modalGantiPw">
                     <i class="fas fa-key"></i></button>
                   {% endif %}
+                  <button type="button" class="btn btn-xs btn-outline-info" title="Edit Profil / Email"
+                          onclick="editUser({{ u.id }}, '{{ u.username }}', '{{ (u.nama or '')|replace("'", "\\'") }}', '{{ (u.email or '')|replace("'", "\\'") }}')">
+                    <i class="fas fa-user-pen"></i></button>
                   {% if u.username not in ('admin', 'siadmin') and u.role != 'ADMIN' %}
                   <!-- Change role dropdown -->
                   <div class="dropdown">
@@ -859,6 +981,10 @@
             <div class="col-6">
               <label class="form-label small fw-semibold">Nama Lengkap</label>
               <input type="text" name="nama" class="form-control form-control-sm">
+            </div>
+            <div class="col-6">
+              <label class="form-label small fw-semibold">Email</label>
+              <input type="email" name="email" class="form-control form-control-sm" placeholder="user@lintas.asia">
             </div>
             <div class="col-6">
               <label class="form-label small fw-semibold">Password *</label>
@@ -995,6 +1121,43 @@
 </div>
 
 <!-- Modal Reset Password -->
+<!-- Modal Edit User -->
+<div class="modal fade" id="modalEditUser" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title"><i class="fas fa-user-edit me-2"></i>Edit Data User</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST">
+        <input type="hidden" name="action" value="edit_user">
+        <input type="hidden" name="user_id" id="editUserId">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Username</label>
+              <input type="text" id="editUserUsername" class="form-control form-control-sm bg-light" readonly>
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Nama Lengkap</label>
+              <input type="text" name="nama" id="editUserNama" class="form-control form-control-sm">
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Email</label>
+              <input type="email" name="email" id="editUserEmail" class="form-control form-control-sm" placeholder="user@lintas.asia">
+              <div class="form-text" style="font-size:.72rem">Digunakan untuk login langsung dan verifikasi login Google / OAuth.</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-save me-1"></i>Simpan Perubahan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="modalResetPw" tabindex="-1">
   <div class="modal-dialog modal-sm">
     <div class="modal-content">
@@ -1135,6 +1298,10 @@ function updateClearBtn() {
   document.getElementById('btnClearFinal').disabled = !ok;
 }
 document.addEventListener('DOMContentLoaded', function(){
+  var cbUrl = document.getElementById('oauthCallbackUrl');
+  if (cbUrl && window.location.origin) {
+    cbUrl.textContent = window.location.origin + '/auth/google/callback';
+  }
   document.getElementById('inputKonfirmasi').addEventListener('input', updateClearBtn);
   document.getElementById('inputPassword').addEventListener('input', updateClearBtn);
   var addRole = document.getElementById('addUserRole');
@@ -1162,6 +1329,13 @@ document.getElementById('roleLegend').addEventListener('hide.bs.collapse', funct
   document.getElementById('roleLegendIcon').style.transform = '';
   document.getElementById('roleLegendTxt').textContent = 'Lihat';
 });
+function editUser(id, username, nama, email) {
+  document.getElementById('editUserId').value = id;
+  document.getElementById('editUserUsername').value = username;
+  document.getElementById('editUserNama').value = nama;
+  document.getElementById('editUserEmail').value = email;
+  new bootstrap.Modal(document.getElementById('modalEditUser')).show();
+}
 function resetPw(uid, username) {
   document.getElementById('resetUserId').value = uid;
   document.getElementById('resetUsername').textContent = username;

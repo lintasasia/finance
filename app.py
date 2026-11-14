@@ -5,6 +5,9 @@ from datetime import datetime, date, timedelta, timezone
 import json, os, io, calendar, math, time
 import base64, textwrap, unicodedata
 from urllib.parse import urlencode
+import urllib.request
+import urllib.parse
+import secrets
 from hashlib import sha256
 from functools import wraps
 import logging
@@ -707,7 +710,9 @@ def init_db():
         username TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
         nama TEXT,
+        email TEXT,
         role TEXT NOT NULL DEFAULT 'VIEWER',
+        permissions TEXT,
         aktif INTEGER DEFAULT 1,
         dibuat DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -1194,6 +1199,7 @@ def init_db():
     """)
     # migrations
     for col_sql in [
+        "ALTER TABLE users ADD COLUMN email TEXT",
         "ALTER TABLE users ADD COLUMN permissions TEXT",
         "ALTER TABLE jurnal ADD COLUMN tipe_tx TEXT DEFAULT 'JURNAL'",
         "ALTER TABLE jurnal ADD COLUMN nomor_tx TEXT",
@@ -1436,6 +1442,13 @@ def init_db():
         ('pos_icon_mode', 'initial'),
         ('pos_default_payment', 'TUNAI'),
         ('tz_app', TZ_APP_DEFAULT),
+        ('oauth_enabled', '0'),
+        ('oauth_provider', 'google'),
+        ('oauth_client_id', ''),
+        ('oauth_client_secret', ''),
+        ('oauth_auto_create', '0'),
+        ('oauth_default_role', 'KASIR'),
+        ('oauth_allowed_domain', ''),
     ])
 
     if conn.execute('SELECT COUNT(*) FROM users').fetchone()[0] == 0:
@@ -2398,14 +2411,17 @@ def _operator_date_ok(tanggal_str):
 def login():
     if session.get('user_id'):
         return redirect(_url_beranda(session.get('role'), current_permissions()))
+    conn = db()
+    oauth_enabled = get_setting(conn, 'oauth_enabled', '0') == '1'
+    oauth_client_id = get_setting(conn, 'oauth_client_id', '')
+    oauth_provider = get_setting(conn, 'oauth_provider', 'google')
     if request.method == 'POST':
         username = request.form.get('username','').strip()
         password = request.form.get('password','')
         ph = sha256(password.encode()).hexdigest()
-        conn = db()
         user = conn.execute(
-            "SELECT * FROM users WHERE username=? AND password_hash=? AND aktif=1",
-            (username, ph)
+            "SELECT * FROM users WHERE (username=? OR (email=? AND email!='')) AND password_hash=? AND aktif=1",
+            (username, username, ph)
         ).fetchone()
         conn.close()
         if user:
@@ -2419,7 +2435,246 @@ def login():
             user_perms = effective_permissions(user['role'], user['permissions'] if 'permissions' in user.keys() else None)
             return redirect(_url_beranda(user['role'], user_perms))
         flash('Username atau password salah.', 'danger')
-    return render_template('login.html')
+        conn = db()
+    conn.close()
+    return render_template('login.html', oauth_enabled=oauth_enabled, oauth_client_id=oauth_client_id, oauth_provider=oauth_provider)
+
+
+def _oauth_redirect_uri(provider='google'):
+    proto = request.headers.get('X-Forwarded-Proto') or request.scheme
+    host = request.headers.get('X-Forwarded-Host') or request.host
+    if request.is_secure or request.headers.get('X-Forwarded-Proto') == 'https':
+        proto = 'https'
+    path = request.path
+    if path in ('/auth/google/callback', '/login/oauth/callback'):
+        return f"{proto}://{host}{path}"
+    if provider == 'google':
+        return f"{proto}://{host}/auth/google/callback"
+    return f"{proto}://{host}/login/oauth/callback"
+
+
+@app.route('/login/oauth')
+def oauth_login():
+    conn = db()
+    oauth_enabled = get_setting(conn, 'oauth_enabled', '0') == '1'
+    client_id = get_setting(conn, 'oauth_client_id', '').strip()
+    provider = get_setting(conn, 'oauth_provider', 'google').strip()
+    conn.close()
+
+    if not oauth_enabled or not client_id:
+        flash('Login OAuth belum diaktifkan atau dikonfigurasi.', 'warning')
+        return redirect(url_for('login'))
+
+    state = secrets.token_urlsafe(24)
+    session['oauth_state'] = state
+    redirect_uri = _oauth_redirect_uri(provider)
+
+    if provider == 'google':
+        params = {
+            'client_id': client_id,
+            'redirect_uri': redirect_uri,
+            'response_type': 'code',
+            'scope': 'openid email profile',
+            'state': state,
+            'access_type': 'online',
+            'prompt': 'select_account'
+        }
+        return redirect('https://accounts.google.com/o/oauth2/v2/auth?' + urllib.parse.urlencode(params))
+    elif provider == 'microsoft':
+        params = {
+            'client_id': client_id,
+            'redirect_uri': redirect_uri,
+            'response_type': 'code',
+            'scope': 'openid email profile User.Read',
+            'state': state,
+            'response_mode': 'query',
+        }
+        return redirect('https://login.microsoftonline.com/common/oauth2/v2.0/authorize?' + urllib.parse.urlencode(params))
+    elif provider == 'github':
+        params = {
+            'client_id': client_id,
+            'redirect_uri': redirect_uri,
+            'scope': 'read:user user:email',
+            'state': state,
+        }
+        return redirect('https://github.com/login/oauth/authorize?' + urllib.parse.urlencode(params))
+    else:
+        flash(f'Provider OAuth {provider} belum didukung.', 'danger')
+        return redirect(url_for('login'))
+
+
+@app.route('/auth/google/callback')
+@app.route('/login/oauth/callback')
+def oauth_callback():
+    error = request.args.get('error')
+    if error:
+        flash(f'Autentikasi OAuth dibatalkan atau gagal: {error}', 'danger')
+        return redirect(url_for('login'))
+
+    req_state = request.args.get('state', '')
+    saved_state = session.pop('oauth_state', None)
+    if not req_state or req_state != saved_state:
+        flash('Validasi keamanan (state CSRF) OAuth gagal. Silakan coba lagi.', 'danger')
+        return redirect(url_for('login'))
+
+    code = request.args.get('code')
+    if not code:
+        flash('Kode otorisasi OAuth tidak ditemukan.', 'danger')
+        return redirect(url_for('login'))
+
+    conn = db()
+    oauth_enabled = get_setting(conn, 'oauth_enabled', '0') == '1'
+    client_id = get_setting(conn, 'oauth_client_id', '').strip()
+    client_secret = get_setting(conn, 'oauth_client_secret', '').strip()
+    provider = get_setting(conn, 'oauth_provider', 'google').strip()
+    auto_create = get_setting(conn, 'oauth_auto_create', '0') == '1'
+    default_role = get_setting(conn, 'oauth_default_role', 'KASIR').strip()
+    allowed_domain = get_setting(conn, 'oauth_allowed_domain', '').strip().lower()
+
+    if not oauth_enabled or not client_id or not client_secret:
+        conn.close()
+        flash('Konfigurasi OAuth belum lengkap.', 'danger')
+        return redirect(url_for('login'))
+
+    redirect_uri = _oauth_redirect_uri(provider)
+    email = ''
+    nama = ''
+
+    try:
+        if provider == 'google':
+            token_url = 'https://oauth2.googleapis.com/token'
+            post_data = urllib.parse.urlencode({
+                'code': code,
+                'client_id': client_id,
+                'client_secret': client_secret,
+                'redirect_uri': redirect_uri,
+                'grant_type': 'authorization_code'
+            }).encode('utf-8')
+            req = urllib.request.Request(token_url, data=post_data, headers={'Content-Type': 'application/x-www-form-urlencoded'})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                token_res = json.loads(resp.read().decode('utf-8'))
+            access_token = token_res.get('access_token')
+
+            userinfo_url = 'https://www.googleapis.com/oauth2/v2/userinfo'
+            req_u = urllib.request.Request(userinfo_url, headers={'Authorization': f'Bearer {access_token}'})
+            with urllib.request.urlopen(req_u, timeout=10) as resp_u:
+                user_info = json.loads(resp_u.read().decode('utf-8'))
+            email = (user_info.get('email') or '').strip().lower()
+            nama = (user_info.get('name') or user_info.get('given_name') or '').strip()
+
+        elif provider == 'microsoft':
+            token_url = 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
+            post_data = urllib.parse.urlencode({
+                'code': code,
+                'client_id': client_id,
+                'client_secret': client_secret,
+                'redirect_uri': redirect_uri,
+                'grant_type': 'authorization_code'
+            }).encode('utf-8')
+            req = urllib.request.Request(token_url, data=post_data, headers={'Content-Type': 'application/x-www-form-urlencoded'})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                token_res = json.loads(resp.read().decode('utf-8'))
+            access_token = token_res.get('access_token')
+
+            userinfo_url = 'https://graph.microsoft.com/v1.0/me'
+            req_u = urllib.request.Request(userinfo_url, headers={'Authorization': f'Bearer {access_token}'})
+            with urllib.request.urlopen(req_u, timeout=10) as resp_u:
+                user_info = json.loads(resp_u.read().decode('utf-8'))
+            email = (user_info.get('mail') or user_info.get('userPrincipalName') or '').strip().lower()
+            nama = (user_info.get('displayName') or '').strip()
+
+        elif provider == 'github':
+            token_url = 'https://github.com/login/oauth/access_token'
+            post_data = urllib.parse.urlencode({
+                'code': code,
+                'client_id': client_id,
+                'client_secret': client_secret,
+                'redirect_uri': redirect_uri
+            }).encode('utf-8')
+            req = urllib.request.Request(token_url, data=post_data, headers={'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                token_res = json.loads(resp.read().decode('utf-8'))
+            access_token = token_res.get('access_token')
+
+            req_u = urllib.request.Request('https://api.github.com/user', headers={'Authorization': f'Bearer {access_token}', 'User-Agent': 'Finance-App'})
+            with urllib.request.urlopen(req_u, timeout=10) as resp_u:
+                user_info = json.loads(resp_u.read().decode('utf-8'))
+            email = (user_info.get('email') or '').strip().lower()
+            nama = (user_info.get('name') or user_info.get('login') or '').strip()
+            if not email:
+                req_e = urllib.request.Request('https://api.github.com/user/emails', headers={'Authorization': f'Bearer {access_token}', 'User-Agent': 'Finance-App'})
+                with urllib.request.urlopen(req_e, timeout=10) as resp_e:
+                    emails = json.loads(resp_e.read().decode('utf-8'))
+                    for e in emails:
+                        if e.get('primary') and e.get('verified'):
+                            email = e.get('email', '').lower()
+                            break
+    except Exception as e:
+        conn.close()
+        app.logger.error('OAuth exchange error: %s', e)
+        flash(f'Gagal memproses otorisasi OAuth: {str(e)}', 'danger')
+        return redirect(url_for('login'))
+
+    if not email:
+        conn.close()
+        flash('Email tidak dapat diperoleh dari akun OAuth Anda.', 'danger')
+        return redirect(url_for('login'))
+
+    if allowed_domain:
+        domains = [d.strip() for d in allowed_domain.split(',') if d.strip()]
+        user_domain = email.split('@')[-1] if '@' in email else ''
+        if user_domain not in domains:
+            conn.close()
+            flash(f'Domain email @{user_domain} tidak diizinkan masuk ke sistem.', 'danger')
+            return redirect(url_for('login'))
+
+    user = conn.execute(
+        "SELECT * FROM users WHERE LOWER(email)=? OR LOWER(username)=?",
+        (email, email)
+    ).fetchone()
+
+    if not user:
+        if auto_create:
+            base_username = email.split('@')[0]
+            cand_username = base_username
+            idx = 1
+            while conn.execute("SELECT id FROM users WHERE username=?", (cand_username,)).fetchone():
+                cand_username = f"{base_username}{idx}"
+                idx += 1
+            rand_pw = secrets.token_hex(16)
+            ph = sha256(rand_pw.encode()).hexdigest()
+            perms = json.dumps(sorted(ROLE_DEFAULT_PERMISSIONS.get(default_role, set())))
+            conn.execute(
+                "INSERT INTO users(username, email, password_hash, nama, role, aktif, permissions) VALUES(?,?,?,?,?,1,?)",
+                (cand_username, email, ph, nama or cand_username, default_role, perms)
+            )
+            user_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            conn.commit()
+            user = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+            add_log(conn, 'Auto-create User OAuth', f"Username: {cand_username} | Email: {email} | Role: {default_role}", 'ADMIN')
+            conn.commit()
+        else:
+            conn.close()
+            flash(f'Akun dengan email "{email}" belum terdaftar. Silakan hubungi Administrator.', 'warning')
+            return redirect(url_for('login'))
+
+    if not user['aktif']:
+        conn.close()
+        flash('Akun Anda dinonaktifkan oleh Administrator.', 'danger')
+        return redirect(url_for('login'))
+
+    session['user_id'] = user['id']
+    session['username'] = user['username']
+    session['nama'] = user['nama'] or user['username']
+    session['role'] = user['role']
+
+    add_log(conn, 'Login OAuth', f"Provider: {provider} | Email: {email} | Role: {user['role']}", 'ADMIN')
+    conn.commit()
+    conn.close()
+
+    flash(f'Selamat datang, {session["nama"]}! (Login via {provider.capitalize()})', 'success')
+    user_perms = effective_permissions(user['role'], user['permissions'] if 'permissions' in user.keys() else None)
+    return redirect(_url_beranda(user['role'], user_perms))
 
 
 def _password_bawaan(username):
@@ -21967,20 +22222,54 @@ def settings():
         elif action == 'add_user':
             username = request.form.get('username','').strip()
             password = request.form.get('password','')
-            nama     = request.form.get('nama','')
+            nama     = request.form.get('nama','').strip()
+            email    = request.form.get('email','').strip()
             role     = request.form.get('role','KASIR')
             if role not in ('ADMIN', 'FINANCE', 'MANAJER', 'INVESTOR', 'OPERATOR', 'KASIR'):
                 role = 'KASIR'
             permissions = json.dumps(_permissions_from_form())
             ph = sha256(password.encode()).hexdigest()
             try:
-                conn.execute("INSERT INTO users(username,password_hash,nama,role,permissions) VALUES(?,?,?,?,?)",
-                             (username, ph, nama, role, permissions))
-                add_log(conn, 'Tambah user', f"Username: {username} | Role: {role}", 'ADMIN')
+                conn.execute("INSERT INTO users(username,email,password_hash,nama,role,permissions) VALUES(?,?,?,?,?,?)",
+                             (username, email, ph, nama, role, permissions))
+                add_log(conn, 'Tambah user', f"Username: {username} | Email: {email} | Role: {role}", 'ADMIN')
                 conn.commit()
                 flash(f'User {username} berhasil ditambahkan!','success')
             except sqlite3.IntegrityError:
                 flash('Username sudah digunakan!','danger')
+        elif action == 'edit_user':
+            uid = int(request.form.get('user_id', 0))
+            nama = request.form.get('nama', '').strip()
+            email = request.form.get('email', '').strip()
+            u = conn.execute("SELECT username FROM users WHERE id=?", (uid,)).fetchone()
+            if u:
+                conn.execute("UPDATE users SET nama=?, email=? WHERE id=?", (nama, email, uid))
+                add_log(conn, 'Edit user', f"Username: {u['username']} | Email: {email} | Nama: {nama}", 'ADMIN')
+                conn.commit()
+                flash(f"Data user {u['username']} berhasil diperbarui.", 'success')
+        elif action == 'save_oauth':
+            v_enabled = '1' if request.form.get('oauth_enabled') == '1' else '0'
+            provider = request.form.get('oauth_provider', 'google').strip()
+            client_id = request.form.get('oauth_client_id', '').strip()
+            client_secret = request.form.get('oauth_client_secret', '').strip()
+            auto_create = '1' if request.form.get('oauth_auto_create') == '1' else '0'
+            default_role = request.form.get('oauth_default_role', 'KASIR').strip()
+            if default_role not in ('ADMIN', 'FINANCE', 'MANAJER', 'INVESTOR', 'OPERATOR', 'KASIR'):
+                default_role = 'KASIR'
+            allowed_domain = request.form.get('oauth_allowed_domain', '').strip().lower()
+
+            for k, v in [
+                ('oauth_enabled', v_enabled),
+                ('oauth_provider', provider),
+                ('oauth_client_id', client_id),
+                ('oauth_client_secret', client_secret),
+                ('oauth_auto_create', auto_create),
+                ('oauth_default_role', default_role),
+                ('oauth_allowed_domain', allowed_domain),
+            ]:
+                conn.execute("INSERT OR REPLACE INTO settings(key, value) VALUES(?, ?)", (k, v))
+            conn.commit()
+            flash('Konfigurasi OAuth berhasil disimpan.', 'success')
         elif action == 'toggle_user':
             uid = int(request.form.get('user_id',0))
             u = conn.execute("SELECT username, aktif FROM users WHERE id=?", (uid,)).fetchone()
@@ -22105,6 +22394,15 @@ def settings():
         users.append(u)
     akun_kas = conn.execute("SELECT * FROM akun WHERE is_rekening=1 ORDER BY kode").fetchall()
     rekening_list = get_rekening_saldo(conn)
+    oauth_config = {
+        'enabled': get_setting(conn, 'oauth_enabled', '0'),
+        'provider': get_setting(conn, 'oauth_provider', 'google'),
+        'client_id': get_setting(conn, 'oauth_client_id', ''),
+        'client_secret': get_setting(conn, 'oauth_client_secret', ''),
+        'auto_create': get_setting(conn, 'oauth_auto_create', '0'),
+        'default_role': get_setting(conn, 'oauth_default_role', 'KASIR'),
+        'allowed_domain': get_setting(conn, 'oauth_allowed_domain', ''),
+    }
     conn.close()
     _hak_label = {k: (label, desc) for k, label, desc in USER_PERMISSIONS}
     return render_template('settings.html',
@@ -22112,6 +22410,7 @@ def settings():
         tz_bisa_diatur=hasattr(time, 'tzset'),
         users=users, akun_kas=akun_kas,
         rekening_list=rekening_list, pos_struk=pos_struk,
+        oauth_config=oauth_config,
         permissions_avail=USER_PERMISSIONS,
         permission_groups=[(judul, rahasia, [(k,) + _hak_label[k] for k in keys])
                            for judul, rahasia, keys in PERMISSION_GROUPS],
