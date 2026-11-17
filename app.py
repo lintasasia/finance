@@ -60,6 +60,9 @@ app = Flask(__name__,
     template_folder=os.path.join(_BUNDLE, 'templates'),
     static_folder=os.path.join(_BUNDLE, 'static'))
 app.config['TEMPLATES_AUTO_RELOAD'] = True
+
+from external_payroll import external_api_bp as _external_api_bp
+app.register_blueprint(_external_api_bp)
 _key_file = os.path.join(_DATA, '.secret_key')
 if not os.path.exists(_key_file):
     with open(_key_file, 'wb') as _f:

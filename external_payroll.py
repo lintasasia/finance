@@ -7,9 +7,13 @@ import secrets
 import hmac
 import sqlite3
 from typing import Optional
+from functools import wraps
+from flask import Blueprint, request, jsonify, make_response
 
 SETTINGS_API_KEY = 'api_external_payroll_key'
 DEFAULT_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'finansial.db')
+
+external_api_bp = Blueprint('external_api_v1', __name__, url_prefix='/api/v1')
 
 def get_db_connection(db_path: Optional[str] = None):
     """Membuka koneksi sqlite3 dengan row factory Row."""
@@ -92,6 +96,70 @@ def verify_external_api_key(provided_key: Optional[str], conn: Optional[sqlite3.
 
     valid_key = get_or_create_external_api_key(conn=conn, db_path=db_path)
     return hmac.compare_digest(clean_provided, valid_key)
+
+def _apply_cors_headers(response):
+    """Menambahkan CORS headers standar untuk request API eksternal."""
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-API-KEY, x-api-key, Accept'
+    response.headers['Access-Control-Max-Age'] = '86400'
+    return response
+
+def require_external_api_key(f):
+    """
+    Decorator proteksi endpoint API eksternal.
+    Mendukung autentikasi via:
+    - Header 'X-API-KEY' / 'x-api-key'
+    - Header 'Authorization: Bearer <token>'
+    - Query parameter '?api_key=<token>' (fallback)
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if request.method == 'OPTIONS':
+            resp = make_response('', 204)
+            return _apply_cors_headers(resp)
+
+        # 1. Cek Header X-API-KEY
+        provided_key = request.headers.get('X-API-KEY') or request.headers.get('x-api-key')
+        
+        # 2. Cek Header Authorization: Bearer <token>
+        if not provided_key:
+            auth_header = request.headers.get('Authorization', '').strip()
+            if auth_header.lower().startswith('bearer '):
+                provided_key = auth_header[7:].strip()
+
+        # 3. Fallback query parameter
+        if not provided_key:
+            provided_key = request.args.get('api_key')
+
+        if not verify_external_api_key(provided_key):
+            resp = jsonify({
+                'success': False,
+                'error': 'Unauthorized',
+                'message': "Invalid or missing API Key. Provide via 'X-API-KEY' or 'Authorization: Bearer <token>' header."
+            })
+            resp.status_code = 401
+            return _apply_cors_headers(resp)
+
+        return f(*args, **kwargs)
+    return decorated_function
+
+@external_api_bp.after_request
+def after_api_request(response):
+    """Menambahkan CORS dan security header ke setiap response API."""
+    response = _apply_cors_headers(response)
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
+
+@external_api_bp.route('/auth/verify', methods=['GET', 'OPTIONS'])
+@require_external_api_key
+def auth_verify():
+    """Endpoint pengecekan validitas API Key."""
+    return jsonify({
+        'success': True,
+        'message': 'API Key is valid and authorized.',
+        'status': 'authenticated'
+    })
 
 def migrate_payroll_status_columns(conn: sqlite3.Connection):
     """
