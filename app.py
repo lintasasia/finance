@@ -22277,6 +22277,24 @@ def settings():
                 conn.execute("INSERT OR REPLACE INTO settings(key, value) VALUES(?, ?)", (k, v))
             conn.commit()
             flash('Konfigurasi OAuth berhasil disimpan.', 'success')
+        elif action == 'save_external_api':
+            new_key = request.form.get('external_api_key', '').strip()
+            if not new_key or len(new_key) < 16:
+                flash('API Key minimal harus 16 karakter demi keamanan.', 'danger')
+            else:
+                from external_payroll import set_external_api_key
+                set_external_api_key(new_key, conn)
+                add_log(conn, 'Update External API Key', 'Private API Key payroll diperbarui lewat antarmuka web', 'ADMIN')
+                conn.commit()
+                flash('Private API Key berhasil disimpan.', 'success')
+        elif action == 'generate_external_api_key':
+            import secrets
+            from external_payroll import set_external_api_key
+            new_key = f"la_sec_{secrets.token_hex(28)}"
+            set_external_api_key(new_key, conn)
+            add_log(conn, 'Rotasi External API Key', 'Key baru digenerate secara acak lewat antarmuka web', 'ADMIN')
+            conn.commit()
+            flash('Private API Key baru berhasil digenerate dan diaktifkan.', 'success')
         elif action == 'toggle_user':
             uid = int(request.form.get('user_id',0))
             if uid == session.get('user_id'):
@@ -22425,6 +22443,8 @@ def settings():
         'default_role': get_setting(conn, 'oauth_default_role', 'KASIR'),
         'allowed_domain': get_setting(conn, 'oauth_allowed_domain', ''),
     }
+    from external_payroll import get_or_create_external_api_key
+    external_api_key = get_or_create_external_api_key(conn)
     conn.close()
     _hak_label = {k: (label, desc) for k, label, desc in USER_PERMISSIONS}
     return render_template('settings.html',
@@ -22433,6 +22453,7 @@ def settings():
         users=users, akun_kas=akun_kas,
         rekening_list=rekening_list, pos_struk=pos_struk,
         oauth_config=oauth_config,
+        external_api_key=external_api_key,
         permissions_avail=USER_PERMISSIONS,
         permission_groups=[(judul, rahasia, [(k,) + _hak_label[k] for k in keys])
                            for judul, rahasia, keys in PERMISSION_GROUPS],

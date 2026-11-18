@@ -620,6 +620,85 @@
     </div>
   </div>
 
+  <!-- Integrasi External API (siCare Karir & Pihak Ketiga) -->
+  <div class="col-12" id="external-api-config" style="scroll-margin-top:76px">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+          <i class="fas fa-network-wired text-success"></i>
+          <span class="section-title">Integrasi External API (siCare Karir &amp; Pihak Ketiga)</span>
+          <span class="badge bg-success" style="font-size:.65rem">API AKTIF</span>
+        </div>
+        <a href="/api/docs" target="_blank" class="btn btn-outline-primary btn-xs">
+          <i class="fas fa-book-open me-1"></i>Swagger UI Docs
+        </a>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">
+          Konfigurasi kunci akses (Private API Key) untuk menghubungkan aplikasi Finance dengan portal karyawan <strong>karir.faishalnafi.com</strong> (siCare).
+          Kunci ini dikirim melalui header <code>X-API-KEY</code> atau <code>Authorization: Bearer &lt;token&gt;</code>.
+        </p>
+
+        <form method="POST" action="/settings" class="mb-3">
+          <input type="hidden" name="action" value="save_external_api">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">Base URL API</label>
+              <div class="input-group input-group-sm">
+                <input type="text" class="form-control bg-light font-monospace" id="externalApiBaseUrl" value="{{ request.host_url.rstrip('/') }}/api/v1" readonly>
+                <button type="button" class="btn btn-outline-secondary" onclick="navigator.clipboard.writeText(document.getElementById('externalApiBaseUrl').value);this.innerHTML='<i class=\'fas fa-check\'></i>';setTimeout(()=>this.innerHTML='<i class=\'fas fa-copy\'></i>',1500)" title="Salin Base URL">
+                  <i class="fas fa-copy"></i>
+                </button>
+              </div>
+              <div class="form-text small">Endpoint rincian gaji: <code>/api/v1/payroll/{employee_id}</code></div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">Private API Key (Secret)</label>
+              <div class="input-group input-group-sm">
+                <input type="password" name="external_api_key" id="inputExternalApiKey" class="form-control font-monospace" value="{{ external_api_key }}" required minlength="16">
+                <button type="button" class="btn btn-outline-secondary" id="btnToggleApiKey" onclick="var inp=document.getElementById('inputExternalApiKey');var icn=this.querySelector('i');if(inp.type==='password'){inp.type='text';icn.classList.replace('fa-eye','fa-eye-slash');}else{inp.type='password';icn.classList.replace('fa-eye-slash','fa-eye');}" title="Lihat/Sembunyikan Key">
+                  <i class="fas fa-eye"></i>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" onclick="navigator.clipboard.writeText(document.getElementById('inputExternalApiKey').value);this.innerHTML='<i class=\'fas fa-check\'></i>';setTimeout(()=>this.innerHTML='<i class=\'fas fa-copy\'></i>',1500)" title="Salin API Key">
+                  <i class="fas fa-copy"></i>
+                </button>
+              </div>
+              <div class="form-text small">Rahasiakan token ini. Jangan dibagikan ke publik.</div>
+            </div>
+
+            <div class="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2 pt-2">
+              <div class="text-muted small">
+                <i class="fas fa-shield-alt text-success me-1"></i>Enkripsi konstan terproteksi dari timing attack.
+              </div>
+              <div>
+                <button type="submit" class="btn btn-primary btn-sm">
+                  <i class="fas fa-save me-1"></i>Simpan API Key
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+
+        <hr class="my-3 opacity-25">
+
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div>
+            <div class="fw-semibold small"><i class="fas fa-arrows-rotate me-1 text-warning"></i>Rotasi API Key</div>
+            <div class="text-muted" style="font-size:.78rem">Generate acak token 63 karakter baru jika kunci lama dicurigai bocor.</div>
+          </div>
+          <form method="POST" action="/settings" class="m-0" onsubmit="return confirm('Peringatan: Membuat API Key baru akan memutus integrasi aplikasi lama hingga key baru diperbarui di portal karir. Lanjutkan?')">
+            <input type="hidden" name="action" value="generate_external_api_key">
+            <button type="submit" class="btn btn-outline-warning btn-sm">
+              <i class="fas fa-arrows-rotate me-1"></i>Generate Key Baru
+            </button>
+          </form>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
   <!-- Manajemen User -->
   <div class="col-12" id="manajemen-user" style="scroll-margin-top:76px">
     <div class="card">
