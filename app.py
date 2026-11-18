@@ -16460,8 +16460,118 @@ def gaji_riwayat():
         periodes[key]['total_pph21']  += row['pph21']
         periodes[key]['total_bersih'] += row['gaji_bersih']
         periodes[key]['total_tanggungan'] += row['tanggungan']
+    akun_kas = conn.execute("SELECT kode, nama FROM akun WHERE is_rekening=1 ORDER BY kode").fetchall()
     conn.close()
-    return render_template('gaji_riwayat.html', periodes=list(periodes.values()))
+    return render_template('gaji_riwayat.html',
+                           periodes=list(periodes.values()),
+                           akun_kas=akun_kas,
+                           today=date.today().strftime('%Y-%m-%d'))
+
+
+# ── Bayar Gaji Karyawan ─────────────────────────────────────────────────────
+
+@app.route('/gaji/<int:pid>/bayar', methods=['POST'])
+@finance_required
+def gaji_bayar(pid):
+    r = _require_pajak_module()
+    if r: return r
+    conn = db()
+    p = conn.execute("""
+        SELECT p.*, k.nama AS nama_karyawan, k.no_karyawan
+        FROM payroll p
+        JOIN karyawan k ON k.id=p.karyawan_id
+        WHERE p.id=?
+    """, (pid,)).fetchone()
+
+    if not p:
+        conn.close()
+        flash('Data payroll tidak ditemukan.', 'danger')
+        return redirect(url_for('gaji_riwayat'))
+
+    tanggal_bayar = (request.form.get('tanggal_bayar') or date.today().strftime('%Y-%m-%d')).strip()
+    if not is_valid_iso_date(tanggal_bayar):
+        conn.close()
+        flash('Format tanggal pembayaran tidak valid.', 'danger')
+        return redirect(url_for('gaji_riwayat'))
+
+    akun_kas_kode = (request.form.get('akun_kas') or '').strip()
+    akun_kas = conn.execute("SELECT kode, nama FROM akun WHERE kode=? AND is_rekening=1", (akun_kas_kode,)).fetchone()
+    if not akun_kas:
+        conn.close()
+        flash('Pilih rekening kas/bank pembayaran yang valid.', 'warning')
+        return redirect(url_for('gaji_riwayat'))
+
+    gaji_bersih = float(p['gaji_bersih'] or 0)
+    if gaji_bersih <= 0:
+        conn.close()
+        flash('Nominal gaji bersih tidak valid.', 'danger')
+        return redirect(url_for('gaji_riwayat'))
+
+    nm_bln = BULAN_PANJANG[p['periode_bulan'] - 1]
+    ket = f"Pembayaran Gaji {p['nama_karyawan']} - {nm_bln} {p['periode_tahun']}"
+    catatan_bayar = (request.form.get('catatan') or '').strip()
+    if catatan_bayar:
+        ket += f" ({catatan_bayar})"
+
+    # Jurnal pelunasan Hutang Gaji:
+    # Dr 2120 Hutang Gaji = gaji_bersih
+    # Cr [akun_kas_kode]   = gaji_bersih
+    entries = [
+        ('2120', gaji_bersih, 0),
+        (akun_kas_kode, 0, gaji_bersih)
+    ]
+
+    try:
+        j_id = insert_jurnal(conn, tanggal_bayar, ket, 'GAJI', 'PENGELUARAN', entries, pihak=p['nama_karyawan'])
+    except ValueError as ex:
+        conn.close()
+        flash(f'Gagal membuat jurnal pembayaran: {ex}', 'danger')
+        return redirect(url_for('gaji_riwayat'))
+
+    conn.execute("""
+        UPDATE payroll 
+        SET status_bayar = 'SUDAH_DIBAYAR', tanggal_bayar = ?
+        WHERE id = ?
+    """, (tanggal_bayar, pid))
+    conn.commit()
+
+    add_log(conn, 'Bayar Gaji', f"{p['nama_karyawan']} | {nm_bln} {p['periode_tahun']} | Rp {gaji_bersih:,.0f} via {akun_kas['nama']} (Jurnal #{j_id})", 'GAJI')
+    conn.commit()
+    conn.close()
+
+    flash(f'Gaji {p["nama_karyawan"]} periode {nm_bln} {p["periode_tahun"]} sebesar Rp {gaji_bersih:,.0f} berhasil dibayarkan via {akun_kas["nama"]}! Status slip kini SUDAH DIBAYAR.', 'success')
+    return redirect(url_for('gaji_riwayat'))
+
+
+@app.route('/gaji/<int:pid>/batal-bayar', methods=['POST'])
+@finance_required
+def gaji_batal_bayar(pid):
+    r = _require_pajak_module()
+    if r: return r
+    conn = db()
+    p = conn.execute("""
+        SELECT p.*, k.nama AS nama_karyawan
+        FROM payroll p
+        JOIN karyawan k ON k.id=p.karyawan_id
+        WHERE p.id=?
+    """, (pid,)).fetchone()
+
+    if not p:
+        conn.close()
+        flash('Data payroll tidak ditemukan.', 'danger')
+        return redirect(url_for('gaji_riwayat'))
+
+    conn.execute("""
+        UPDATE payroll 
+        SET status_bayar = 'BELUM_DIBAYAR', tanggal_bayar = NULL
+        WHERE id = ?
+    """, (pid,))
+    conn.commit()
+    add_log(conn, 'Batal Bayar Gaji', f"{p['nama_karyawan']} | ID #{pid} diubah ke BELUM_DIBAYAR", 'GAJI')
+    conn.commit()
+    conn.close()
+    flash(f'Status pembayaran gaji {p["nama_karyawan"]} berhasil dikembalikan ke BELUM DIBAYAR.', 'info')
+    return redirect(url_for('gaji_riwayat'))
 
 # ── Slip Gaji (print) ──────────────────────────────────────────────────────
 

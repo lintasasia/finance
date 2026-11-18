@@ -590,14 +590,15 @@ def get_employee_payroll(employee_id: str):
 
     conn = get_db_connection()
     try:
-        # Cari karyawan berdasarkan no_karyawan (case-insensitive) atau id numerik
+        # Cari karyawan berdasarkan no_karyawan (case-insensitive), id numerik, atau nama
         k = conn.execute("""
             SELECT id, no_karyawan, nama, jabatan, status_kerja, status_pajak, npwp, aktif
             FROM karyawan
             WHERE LOWER(TRIM(no_karyawan)) = LOWER(TRIM(?))
                OR (CAST(? AS INTEGER) > 0 AND id = CAST(? AS INTEGER))
+               OR LOWER(TRIM(nama)) = LOWER(TRIM(?))
             LIMIT 1
-        """, (clean_id, clean_id, clean_id)).fetchone()
+        """, (clean_id, clean_id, clean_id, clean_id)).fetchone()
 
         if not k:
             return jsonify({

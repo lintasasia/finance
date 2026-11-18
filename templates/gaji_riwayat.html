@@ -57,6 +57,7 @@
             <th class="text-end">Potongan BPJS</th>
             <th class="text-end">PPh 21</th>
             <th class="text-end">Take-Home</th>
+            <th class="text-center">Status</th>
             <th class="text-end" title="Iuran yang dibayar perusahaan, tidak memotong gaji: BPJS Kesehatan, BPJS Ketenagakerjaan (JHT + JP), JKK, dan JKM">Tanggungan Perusahaan</th>
             <th class="text-end pe-3">Aksi</th>
           </tr>
@@ -74,11 +75,38 @@
             </td>
             <td class="text-end text-rp text-danger">{{ row.pph21|rp }}</td>
             <td class="text-end text-rp fw-semibold text-success">{{ row.gaji_bersih|rp }}</td>
+            <td class="text-center">
+              {% if row.status_bayar == 'SUDAH_DIBAYAR' %}
+                <span class="badge bg-success" style="font-size:.68rem">
+                  <i class="fas fa-check-circle me-1"></i>LUNAS
+                </span>
+                {% if row.tanggal_bayar %}
+                  <div class="text-muted" style="font-size:.65rem">{{ row.tanggal_bayar }}</div>
+                {% endif %}
+              {% else %}
+                <span class="badge bg-warning text-dark" style="font-size:.68rem">
+                  <i class="fas fa-clock me-1"></i>BELUM DIBAYAR
+                </span>
+              {% endif %}
+            </td>
             <td class="text-end text-rp text-muted"{% if row.rincian_tanggungan %} title="{{ row.rincian_tanggungan }}"{% endif %}>
               {{ row.tanggungan|rp }}
             </td>
             <td class="text-end pe-3">
-              <div class="d-flex gap-1 justify-content-end">
+              <div class="d-flex gap-1 justify-content-end align-items-center">
+                {% if row.status_bayar != 'SUDAH_DIBAYAR' %}
+                  <button type="button" class="btn btn-xs btn-success text-white" title="Bayar Gaji Karyawan"
+                          onclick="bukaModalBayar({{ row.id }}, '{{ row.nama_karyawan|escape }}', '{{ row.gaji_bersih|rp }}', '{{ periode.nm_bln }} {{ periode.tahun }}')">
+                    <i class="fas fa-money-bill-wave me-1"></i>Bayar
+                  </button>
+                {% else %}
+                  <form method="POST" action="/gaji/{{ row.id }}/batal-bayar" class="m-0"
+                        onsubmit="return confirm('Kembalikan status gaji {{ row.nama_karyawan }} ke BELUM DIBAYAR?')">
+                    <button class="btn btn-xs btn-outline-secondary" title="Batalkan Pembayaran">
+                      <i class="fas fa-undo"></i>
+                    </button>
+                  </form>
+                {% endif %}
                 <a href="/gaji/{{ row.id }}/slip" target="_blank"
                    class="btn btn-xs btn-outline-primary" title="Cetak Slip">
                   <i class="fas fa-file-alt"></i></a>
@@ -101,6 +129,7 @@
             </td>
             <td class="text-end text-rp text-danger">{{ periode.total_pph21|rp }}</td>
             <td class="text-end text-rp text-success">{{ periode.total_bersih|rp }}</td>
+            <td></td>
             <td class="text-end text-rp text-muted">{{ periode.total_tanggungan|rp }}</td>
             <td class="pe-3"></td>
           </tr>
@@ -112,4 +141,66 @@
 {% endfor %}
 
 {{ pagination(pg) }}
+
+<!-- Modal Bayar Gaji Karyawan -->
+<div class="modal fade" id="modalBayarGaji" tabindex="-1" aria-labelledby="modalBayarGajiLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" id="formBayarGaji" action="">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalBayarGajiLabel">
+            <i class="fas fa-money-bill-wave text-success me-2"></i>Bayar Gaji Karyawan
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-info py-2 px-3 small mb-3">
+            <div class="fw-bold" id="bayarNamaKaryawan">-</div>
+            <div class="text-muted" id="bayarPeriode">-</div>
+            <div class="mt-1 fs-6 fw-bold text-success" id="bayarNominal">-</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Tanggal Pembayaran <span class="text-danger">*</span></label>
+            <input type="date" name="tanggal_bayar" class="form-control form-control-sm" value="{{ today }}" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Rekening Kas / Bank <span class="text-danger">*</span></label>
+            <select name="akun_kas" class="form-select form-select-sm" required>
+              <option value="" disabled selected>-- Pilih Rekening Kas/Bank --</option>
+              {% for ak in akun_kas %}
+                <option value="{{ ak.kode }}">{{ ak.kode }} - {{ ak.nama }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text" style="font-size:.72rem">Dana akan dipotong dari kas/bank ini dan dicatat di jurnal pengeluaran.</div>
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label fw-semibold small">Catatan Pembayaran (Opsional)</label>
+            <input type="text" name="catatan" class="form-control form-control-sm" placeholder="Contoh: Transfer via M-Banking / No. Ref Transaksi">
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-sm btn-success">
+            <i class="fas fa-check-circle me-1"></i>Konfirmasi &amp; Bayar Gaji
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function bukaModalBayar(payrollId, namaKaryawan, nominalRp, periodeStr) {
+  document.getElementById('formBayarGaji').action = '/gaji/' + payrollId + '/bayar';
+  document.getElementById('bayarNamaKaryawan').textContent = namaKaryawan;
+  document.getElementById('bayarPeriode').textContent = 'Periode: ' + periodeStr;
+  document.getElementById('bayarNominal').textContent = 'Take-Home Pay: ' + nominalRp;
+  
+  var modal = new bootstrap.Modal(document.getElementById('modalBayarGaji'));
+  modal.show();
+}
+</script>
 {% endblock %}
