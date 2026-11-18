@@ -48,6 +48,33 @@ Aplikasi manajemen finansial, akuntansi terpadu, dan operasional bisnis berbasis
 * **Audit Trail**: Pencatatan log aktivitas sistem untuk transparansi audit.
 * **Progressive Web App (PWA)**: Dapat diinstal langsung di perangkat mobile & tablet.
 
+### 8. 🌐 External REST API & Swagger UI (Integrasi siCare Karir)
+* **Payroll & Slip Gaji API**: Menyediakan data riwayat payroll, breakdown potongan (BPJS, PPh21), take-home pay, dan status pelunasan gaji (`is_paid`, `status_bayar`, `tanggal_bayar`) untuk portal karyawan **karir.faishalnafi.com**.
+* **Keamanan Private API Key**: Autentikasi server-to-server via header `X-API-KEY` atau `Authorization: Bearer <token>`, terproteksi dari *timing attacks* (`hmac.compare_digest`).
+* **Swagger UI / OpenAPI 3.0**: Dokumentasi interaktif terstandarisasi yang dapat diakses di `/api/docs` dengan fitur *Authorize* langsung di browser.
+* **Web UI Management**: API Key dapat dilihat, disalin, diedit, atau dirotasi langsung dari menu **Pengaturan** (`/settings`) tanpa hardcode.
+
+---
+
+## 📖 Dokumentasi External API
+
+Dokumentasi interaktif dapat dibuka langsung di:
+👉 **[https://finance.lintas.asia/api/docs](https://finance.lintas.asia/api/docs)**
+
+### Daftar Endpoint:
+1. `GET /api/v1/auth/verify` — Memeriksa keabsahan API Key.
+2. `GET /api/v1/payroll/{employee_id}` — Mengambil riwayat payroll dan status pembayaran gaji karyawan berdasarkan `no_karyawan` (contoh: `EMP-001`) atau ID internal.
+   * Parameter query opsional: `bulan` (1-12), `tahun`, `status` (`SUDAH_DIBAYAR` / `BELUM_DIBAYAR`), `limit`.
+3. `GET /api/v1/payroll/slip/{payroll_id}` — Mengambil rincian lengkap 1 slip gaji spesifik.
+4. `GET /api/v1/openapi.json` — Spesifikasi OpenAPI 3.0.3 dalam format JSON.
+
+### Contoh Request (cURL):
+```bash
+curl -X GET "https://finance.lintas.asia/api/v1/payroll/EMP-002" \
+     -H "X-API-KEY: YOUR_PRIVATE_API_KEY" \
+     -H "Accept: application/json"
+```
+
 ---
 
 ## 🛠️ Tech Stack
