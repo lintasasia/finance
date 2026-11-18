@@ -16571,6 +16571,19 @@ def gaji_batal_bayar(pid):
         flash('Data payroll tidak ditemukan.', 'danger')
         return redirect(url_for('gaji_riwayat'))
 
+    nm_bln = BULAN_PANJANG[p['periode_bulan'] - 1]
+
+    # Balikkan dan hapus jurnal pembayaran kas/bank jika ada
+    pj = conn.execute("""
+        SELECT id FROM jurnal 
+        WHERE kategori='GAJI' AND tipe_tx='PENGELUARAN' AND pihak=? AND keterangan LIKE ?
+        ORDER BY id DESC LIMIT 1
+    """, (p['nama_karyawan'], f"%{nm_bln} {p['periode_tahun']}%")).fetchone()
+    if pj:
+        _reverse_tx(conn, pj['id'])
+        conn.execute("DELETE FROM detail_jurnal WHERE jurnal_id=?", (pj['id'],))
+        conn.execute("DELETE FROM jurnal WHERE id=?", (pj['id'],))
+
     conn.execute("""
         UPDATE payroll 
         SET status_bayar = 'BELUM_DIBAYAR', tanggal_bayar = NULL
@@ -16733,31 +16746,38 @@ def gaji_hapus(pid):
     r = _require_pajak_module()
     if r: return r
     conn = db()
-    p = conn.execute("SELECT * FROM payroll WHERE id=?", (pid,)).fetchone()
+    p = conn.execute("""
+        SELECT p.*, k.nama AS nama_karyawan 
+        FROM payroll p 
+        JOIN karyawan k ON k.id=p.karyawan_id 
+        WHERE p.id=?
+    """, (pid,)).fetchone()
+
     if p:
+        # Jika statusnya masih SUDAH_DIBAYAR, pandu user untuk Batal Bayar dulu
+        if (p['status_bayar'] or '').upper() == 'SUDAH_DIBAYAR':
+            conn.close()
+            flash('Gaji ini berstatus SUDAH DIBAYAR. Silakan klik tombol "Batal Bayar" terlebih dahulu sebelum menghapus payroll.', 'warning')
+            return redirect(url_for('gaji_riwayat'))
+
         if p['jurnal_id']:
-            kewajiban_rows = conn.execute("""
-                SELECT a.kode, a.nama, COALESCE(SUM(dj.kredit),0) AS nominal
-                  FROM detail_jurnal dj
-                  JOIN akun a ON a.id=dj.akun_id
-                 WHERE dj.jurnal_id=? AND a.kode IN ('2115','2116','2120') AND dj.kredit>0
-                 GROUP BY a.kode, a.nama
-            """, (p['jurnal_id'],)).fetchall()
-            blocked = []
-            for row in kewajiban_rows:
-                saldo = _akun_saldo(conn, row['kode'])
-                if saldo + 0.01 < float(row['nominal'] or 0):
-                    blocked.append(row['nama'])
-            if blocked:
-                conn.close()
-                flash('Payroll ini sudah terkait pembayaran kewajiban. Hapus/batalkan pembayaran '
-                      + ', '.join(blocked) + ' lebih dulu.', 'warning')
-                return redirect(url_for('gaji_riwayat'))
             _reverse_tx(conn, p['jurnal_id'])
+            conn.execute("DELETE FROM detail_jurnal WHERE jurnal_id=?", (p['jurnal_id'],))
             conn.execute("DELETE FROM jurnal WHERE id=?", (p['jurnal_id'],))
+
         conn.execute("DELETE FROM payroll WHERE id=?", (pid,))
         conn.commit()
-        flash('Data gaji dan jurnalnya berhasil dihapus.', 'warning')
+
+        # Notifikasi siCare HRMS agar slip dihapus dari portal siCare jika pernah ada
+        try:
+            from external_payroll import cancel_payroll_in_sicare
+            cancel_payroll_in_sicare(pid, conn=conn)
+        except Exception:
+            pass
+
+        add_log(conn, 'Hapus Payroll', f"{p['nama_karyawan']} | Periode {p['periode_bulan']}/{p['periode_tahun']} dihapus", 'GAJI')
+        conn.commit()
+        flash(f'Data payroll {p["nama_karyawan"]} periode {p["periode_bulan"]}/{p["periode_tahun"]} dan jurnalnya berhasil dihapus.', 'warning')
     conn.close()
     return redirect(url_for('gaji_riwayat'))
 
