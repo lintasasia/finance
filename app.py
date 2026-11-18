@@ -1180,6 +1180,8 @@ def init_db():
         jurnal_id INTEGER,
         catatan TEXT DEFAULT '',
         dibuat DATETIME DEFAULT CURRENT_TIMESTAMP,
+        status_bayar TEXT DEFAULT 'BELUM_DIBAYAR',
+        tanggal_bayar TEXT,
         FOREIGN KEY (karyawan_id) REFERENCES karyawan(id),
         FOREIGN KEY (jurnal_id) REFERENCES jurnal(id) ON DELETE SET NULL
     );
@@ -1337,6 +1339,9 @@ def init_db():
         "ALTER TABLE customer ADD COLUMN nitku TEXT DEFAULT ''",
         "ALTER TABLE vendor ADD COLUMN npwp TEXT DEFAULT ''",
         "ALTER TABLE vendor ADD COLUMN nitku TEXT DEFAULT ''",
+        # Status pembayaran gaji untuk portal Karir/HRMS eksternal
+        "ALTER TABLE payroll ADD COLUMN status_bayar TEXT DEFAULT 'BELUM_DIBAYAR'",
+        "ALTER TABLE payroll ADD COLUMN tanggal_bayar TEXT",
     ]:
         try:
             conn.execute(col_sql)
