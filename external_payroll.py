@@ -8,7 +8,7 @@ import hmac
 import sqlite3
 from typing import Optional, Dict, Any, List
 from functools import wraps
-from flask import Blueprint, request, jsonify, make_response
+from flask import Blueprint, request, jsonify, make_response, render_template
 
 SETTINGS_API_KEY = 'api_external_payroll_key'
 DEFAULT_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'finansial.db')
@@ -243,7 +243,325 @@ def format_payroll_record(p: Any) -> Dict[str, Any]:
         'tanggal_proses': str(row.get('dibuat') or '')
     }
 
+# ---------- OpenAPI 3.0.3 Specification Generator ----------
+
+def get_openapi_spec() -> Dict[str, Any]:
+    """Menghasilkan struktur spesifikasi OpenAPI 3.0.3 resmi untuk Swagger UI."""
+    return {
+        "openapi": "3.0.3",
+        "info": {
+            "title": "Lintas Asia Finance - External Payroll API",
+            "version": "1.0.0",
+            "description": "API resmi untuk integrasi data penggajian dan slip gaji karyawan antara Finance ERP (finance.lintas.asia) dan Portal Karir siCare (karir.faishalnafi.com). Dilengkapi pengamanan Private API Key via header `X-API-KEY` atau `Authorization: Bearer <token>`.",
+            "contact": {
+                "name": "Tim IT Lintas Asia Group",
+                "email": "faishalnafi50@gmail.com"
+            }
+        },
+        "servers": [
+            {
+                "url": "/api/v1",
+                "description": "API v1 Endpoint"
+            }
+        ],
+        "components": {
+            "securitySchemes": {
+                "ApiKeyAuth": {
+                    "type": "apiKey",
+                    "in": "header",
+                    "name": "X-API-KEY",
+                    "description": "Private API Key yang dikonfigurasi di menu Pengaturan Finance"
+                },
+                "BearerAuth": {
+                    "type": "http",
+                    "scheme": "bearer",
+                    "description": "Format token Bearer HTTP Authorization"
+                }
+            },
+            "schemas": {
+                "Employee": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer", "example": 2},
+                        "no_karyawan": {"type": "string", "example": "EMP-002"},
+                        "nama": {"type": "string", "example": "Safa"},
+                        "jabatan": {"type": "string", "example": "Chief Financial Officer (CFO)"},
+                        "status_kerja": {"type": "string", "example": "TETAP"},
+                        "status_pajak": {"type": "string", "example": "TK0"},
+                        "npwp": {"type": "string", "example": ""},
+                        "aktif": {"type": "boolean", "example": True}
+                    }
+                },
+                "PayrollSummary": {
+                    "type": "object",
+                    "properties": {
+                        "total_records": {"type": "integer", "example": 1},
+                        "total_dibayar": {"type": "integer", "example": 1},
+                        "total_belum_dibayar": {"type": "integer", "example": 0}
+                    }
+                },
+                "PayrollRecord": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer", "example": 1},
+                        "periode": {
+                            "type": "object",
+                            "properties": {
+                                "bulan": {"type": "integer", "example": 11},
+                                "nama_bulan": {"type": "string", "example": "November"},
+                                "tahun": {"type": "integer", "example": 2026}
+                            }
+                        },
+                        "status_bayar": {"type": "string", "example": "SUDAH_DIBAYAR"},
+                        "is_paid": {"type": "boolean", "example": True},
+                        "tanggal_bayar": {"type": "string", "nullable": True, "example": "2026-11-02"},
+                        "penghasilan": {
+                            "type": "object",
+                            "properties": {
+                                "jenis_upah": {"type": "string", "example": "BULANAN"},
+                                "gaji_pokok": {"type": "number", "example": 125000.0},
+                                "tunjangan": {"type": "number", "example": 0.0},
+                                "uang_makan": {"type": "number", "example": 0.0},
+                                "uang_transport": {"type": "number", "example": 0.0},
+                                "bonus": {"type": "number", "example": 0.0},
+                                "lain_lain": {"type": "number", "example": 0.0},
+                                "penghasilan_bruto": {"type": "number", "example": 125000.0}
+                            }
+                        },
+                        "potongan": {
+                            "type": "object",
+                            "properties": {
+                                "bpjs_kesehatan": {"type": "number", "example": 0.0},
+                                "bpjs_ketenagakerjaan": {"type": "number", "example": 0.0},
+                                "pph21": {"type": "number", "example": 0.0},
+                                "total_potongan": {"type": "number", "example": 0.0}
+                            }
+                        },
+                        "tanggungan_perusahaan": {
+                            "type": "object",
+                            "properties": {
+                                "bpjs_kesehatan": {"type": "number", "example": 0.0},
+                                "bpjs_ketenagakerjaan": {"type": "number", "example": 0.0},
+                                "bpjs_jkk": {"type": "number", "example": 0.0},
+                                "bpjs_jkm": {"type": "number", "example": 0.0},
+                                "total_tanggungan": {"type": "number", "example": 0.0}
+                            }
+                        },
+                        "take_home_pay": {"type": "number", "example": 125000.0},
+                        "terbilang": {"type": "string", "example": "Seratus dua puluh lima ribu rupiah"},
+                        "catatan": {"type": "string", "example": "Fee Safa Bulan November 2026"},
+                        "tanggal_proses": {"type": "string", "example": "2026-11-15 02:57:22"}
+                    }
+                },
+                "ApiError": {
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean", "example": False},
+                        "error": {"type": "string", "example": "Unauthorized"},
+                        "message": {"type": "string", "example": "Deskripsi pesan kesalahan"}
+                    }
+                }
+            }
+        },
+        "security": [
+            {"ApiKeyAuth": []},
+            {"BearerAuth": []}
+        ],
+        "paths": {
+            "/auth/verify": {
+                "get": {
+                    "tags": ["Autentikasi"],
+                    "summary": "Validasi API Key",
+                    "description": "Memeriksa apakah Private API Key yang dikirimkan valid dan terautentikasi.",
+                    "responses": {
+                        "200": {
+                            "description": "API Key valid dan aktif",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "success": {"type": "boolean", "example": True},
+                                            "message": {"type": "string", "example": "API Key is valid and authorized."},
+                                            "status": {"type": "string", "example": "authenticated"}
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "401": {
+                            "description": "Unauthorized (Key hilang atau tidak cocok)",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/ApiError"}
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "/payroll/{employee_id}": {
+                "get": {
+                    "tags": ["Payroll & Slip Gaji"],
+                    "summary": "Ambil Riwayat Payroll & Status Gaji Karyawan",
+                    "description": "Mengambil daftar slip gaji karyawan berdasarkan nomor karyawan (contoh: `EMP-001`, `EMP-002`) atau ID numerik. Menampilkan status pembayaran apakah sudah dibayar atau belum (`is_paid`, `status_bayar`, dan `tanggal_bayar`).",
+                    "parameters": [
+                        {
+                            "name": "employee_id",
+                            "in": "path",
+                            "required": True,
+                            "description": "Nomor Karyawan (contoh: EMP-002) atau ID internal",
+                            "schema": {"type": "string", "example": "EMP-002"}
+                        },
+                        {
+                            "name": "bulan",
+                            "in": "query",
+                            "required": False,
+                            "description": "Filter bulan periode gaji (1 - 12)",
+                            "schema": {"type": "integer", "minimum": 1, "maximum": 12, "example": 11}
+                        },
+                        {
+                            "name": "tahun",
+                            "in": "query",
+                            "required": False,
+                            "description": "Filter tahun periode gaji",
+                            "schema": {"type": "integer", "example": 2026}
+                        },
+                        {
+                            "name": "status",
+                            "in": "query",
+                            "required": False,
+                            "description": "Filter status pembayaran (SUDAH_DIBAYAR / BELUM_DIBAYAR / ALL)",
+                            "schema": {
+                                "type": "string",
+                                "enum": ["SUDAH_DIBAYAR", "BELUM_DIBAYAR", "ALL"],
+                                "example": "SUDAH_DIBAYAR"
+                            }
+                        },
+                        {
+                            "name": "limit",
+                            "in": "query",
+                            "required": False,
+                            "description": "Batas jumlah slip yang dikembalikan (default 100)",
+                            "schema": {"type": "integer", "default": 100, "example": 50}
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Berhasil mengambil riwayat payroll",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "success": {"type": "boolean", "example": True},
+                                            "data": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "employee": {"$ref": "#/components/schemas/Employee"},
+                                                    "summary": {"$ref": "#/components/schemas/PayrollSummary"},
+                                                    "payrolls": {
+                                                        "type": "array",
+                                                        "items": {"$ref": "#/components/schemas/PayrollRecord"}
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "401": {
+                            "description": "Unauthorized",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/ApiError"}
+                                }
+                            }
+                        },
+                        "404": {
+                            "description": "Karyawan tidak ditemukan",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/ApiError"}
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "/payroll/slip/{payroll_id}": {
+                "get": {
+                    "tags": ["Payroll & Slip Gaji"],
+                    "summary": "Ambil Detail 1 Slip Gaji Spesifik",
+                    "description": "Mengambil rincian breakdown lengkap satu slip gaji berdasarkan ID payroll.",
+                    "parameters": [
+                        {
+                            "name": "payroll_id",
+                            "in": "path",
+                            "required": True,
+                            "description": "ID Payroll unik",
+                            "schema": {"type": "integer", "example": 1}
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Detail slip gaji",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "success": {"type": "boolean", "example": True},
+                                            "data": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "employee": {"$ref": "#/components/schemas/Employee"},
+                                                    "slip": {"$ref": "#/components/schemas/PayrollRecord"}
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "401": {
+                            "description": "Unauthorized",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/ApiError"}
+                                }
+                            }
+                        },
+                        "404": {
+                            "description": "Slip gaji tidak ditemukan",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/ApiError"}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 # ---------- API Endpoints ----------
+
+@external_api_bp.route('/openapi.json', methods=['GET', 'OPTIONS'])
+def openapi_json():
+    """Mengembalikan spesifikasi OpenAPI 3.0.3 resmi dalam format JSON."""
+    if request.method == 'OPTIONS':
+        resp = make_response('', 204)
+        return _apply_cors_headers(resp)
+    resp = jsonify(get_openapi_spec())
+    return _apply_cors_headers(resp)
+
+@external_api_bp.route('/docs', methods=['GET'])
+def api_docs():
+    """Halaman interaktif Swagger UI."""
+    return render_template('swagger_ui.html')
 
 @external_api_bp.route('/auth/verify', methods=['GET', 'OPTIONS'])
 @require_external_api_key
@@ -261,12 +579,6 @@ def get_employee_payroll(employee_id: str):
     """
     Mengambil daftar slip gaji / payroll untuk karyawan tertentu berdasarkan
     no_karyawan (contoh: 'EMP-001') atau ID internal.
-    
-    Query Parameters opsional:
-    - bulan: int (1-12)
-    - tahun: int (misal: 2026)
-    - status: str ('SUDAH_DIBAYAR' / 'BELUM_DIBAYAR' / 'ALL')
-    - limit: int (default 100)
     """
     clean_id = (employee_id or '').strip()
     if not clean_id:

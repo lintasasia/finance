@@ -63,6 +63,11 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 from external_payroll import external_api_bp as _external_api_bp
 app.register_blueprint(_external_api_bp)
+
+@app.route('/api/docs')
+@app.route('/docs')
+def global_api_docs():
+    return redirect(url_for('external_api_v1.api_docs'))
 _key_file = os.path.join(_DATA, '.secret_key')
 if not os.path.exists(_key_file):
     with open(_key_file, 'wb') as _f:
