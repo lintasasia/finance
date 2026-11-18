@@ -31,6 +31,10 @@ errorlog = '/www/wwwlogs/python/finance-lintas/gunicorn_error.log'
 # critical: Critical errors;
 loglevel = 'info'
 
+# Keepalive timeout
+keepalive = 65
+timeout = 60
+
 # Put custom settings here
 # It is best to follow the same format as above: <comment + newline + key = value>.
 # PS: Gunicorn configuration files are Python\-style (i.e., ".py" files); make sure to follow Python syntax.
