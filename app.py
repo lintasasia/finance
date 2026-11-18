@@ -16403,13 +16403,6 @@ def gaji_proses():
               jenis_upah, calc['bonus'], calc['hari_kerja'], calc['qty_output'],
               calc['uang_makan'], calc['uang_transport'], calc['lain_lain']))
         conn.commit()
-        cur_pid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-        # Otomatis kirim (POST) data slip gaji ke siCare HRMS
-        try:
-            from external_payroll import push_payroll_to_sicare
-            push_payroll_to_sicare(cur_pid, conn=conn)
-        except Exception:
-            pass
         add_log(conn, 'Proses gaji', f"{k['nama']} | {nm_bln} {tahun} | Rp {gaji_bersih:,.0f}", 'GAJI')
         conn.commit()
         flash(f'Gaji {k["nama"]} bulan {nm_bln} {tahun} diproses. Jurnal #{j_id} dibuat.', 'success')
@@ -16584,6 +16577,14 @@ def gaji_batal_bayar(pid):
         WHERE id = ?
     """, (pid,))
     conn.commit()
+
+    # Beritahu siCare HRMS bahwa status bayar dibatalkan (agar slip dihapus dari portal siCare)
+    try:
+        from external_payroll import cancel_payroll_in_sicare
+        cancel_payroll_in_sicare(pid, conn=conn)
+    except Exception:
+        pass
+
     add_log(conn, 'Batal Bayar Gaji', f"{p['nama_karyawan']} | ID #{pid} diubah ke BELUM_DIBAYAR", 'GAJI')
     conn.commit()
     conn.close()
