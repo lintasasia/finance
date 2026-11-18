@@ -2,7 +2,6 @@
 Unit tests for Settings Web UI: External API Key Configuration & Rotation.
 """
 import unittest
-import sqlite3
 import os
 import sys
 
@@ -10,13 +9,18 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app import app
-from external_payroll import get_or_create_external_api_key
+from external_payroll import get_or_create_external_api_key, set_external_api_key
 
 class TestSettingsWebUI(unittest.TestCase):
     def setUp(self):
         app.config['TESTING'] = True
         app.config['WTF_CSRF_ENABLED'] = False
         self.client = app.test_client()
+        self.original_key = get_or_create_external_api_key()
+
+    def tearDown(self):
+        if hasattr(self, 'original_key') and self.original_key:
+            set_external_api_key(self.original_key)
 
     def test_settings_page_contains_api_card_for_admin(self):
         with self.client.session_transaction() as sess:
