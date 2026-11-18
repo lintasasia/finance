@@ -16403,6 +16403,13 @@ def gaji_proses():
               jenis_upah, calc['bonus'], calc['hari_kerja'], calc['qty_output'],
               calc['uang_makan'], calc['uang_transport'], calc['lain_lain']))
         conn.commit()
+        cur_pid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        # Otomatis kirim (POST) data slip gaji ke siCare HRMS
+        try:
+            from external_payroll import push_payroll_to_sicare
+            push_payroll_to_sicare(cur_pid, conn=conn)
+        except Exception:
+            pass
         add_log(conn, 'Proses gaji', f"{k['nama']} | {nm_bln} {tahun} | Rp {gaji_bersih:,.0f}", 'GAJI')
         conn.commit()
         flash(f'Gaji {k["nama"]} bulan {nm_bln} {tahun} diproses. Jurnal #{j_id} dibuat.', 'success')
@@ -16535,11 +16542,21 @@ def gaji_bayar(pid):
     """, (tanggal_bayar, pid))
     conn.commit()
 
+    # Otomatis kirim (POST) data slip gaji langsung ke siCare HRMS
+    sync_msg = ""
+    try:
+        from external_payroll import push_payroll_to_sicare
+        push_res = push_payroll_to_sicare(pid, conn=conn)
+        if push_res.get('success'):
+            sync_msg = " dan otomatis langsung dikirim ke slip siCare HRMS!"
+    except Exception:
+        pass
+
     add_log(conn, 'Bayar Gaji', f"{p['nama_karyawan']} | {nm_bln} {p['periode_tahun']} | Rp {gaji_bersih:,.0f} via {akun_kas['nama']} (Jurnal #{j_id})", 'GAJI')
     conn.commit()
     conn.close()
 
-    flash(f'Gaji {p["nama_karyawan"]} periode {nm_bln} {p["periode_tahun"]} sebesar Rp {gaji_bersih:,.0f} berhasil dibayarkan via {akun_kas["nama"]}! Status slip kini SUDAH DIBAYAR.', 'success')
+    flash(f'Gaji {p["nama_karyawan"]} periode {nm_bln} {p["periode_tahun"]} sebesar Rp {gaji_bersih:,.0f} berhasil dibayarkan via {akun_kas["nama"]}! Status slip kini SUDAH DIBAYAR{sync_msg}', 'success')
     return redirect(url_for('gaji_riwayat'))
 
 
@@ -16693,6 +16710,14 @@ def gaji_slip_cetak(pid):
         return redirect(url_for('gaji_riwayat'))
     inv_s = _inv_settings(conn)
     jr = conn.execute("SELECT tanggal FROM jurnal WHERE id=?", (p['jurnal_id'],)).fetchone() if p['jurnal_id'] else None
+
+    # Otomatis pastikan data slip terkirim (POST) ke siCare HRMS saat dicetak
+    try:
+        from external_payroll import push_payroll_to_sicare
+        push_payroll_to_sicare(pid, conn=conn)
+    except Exception:
+        pass
+
     conn.close()
     return render_template('gaji_slip_cetak.html', p=p, inv_s=inv_s, PTKP=PTKP,
                            nm_bln=BULAN_PANJANG[p['periode_bulan'] - 1],

@@ -726,3 +726,90 @@ def migrate_payroll_status_columns(conn: sqlite3.Connection):
           AND (status_bayar IS NULL OR status_bayar = '' OR status_bayar = 'BELUM_DIBAYAR')
     """)
     conn.commit()
+
+
+def push_payroll_to_sicare(payroll_id: int, conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
+    """
+    Mengirimkan (HTTP POST Webhook) data slip gaji dari Finance ERP langsung ke siCare HRMS.
+    Dipanggil otomatis saat:
+    1. Bayar Karyawan di Finance ERP (/gaji/<pid>/bayar)
+    2. Proses Gaji Karyawan (/gaji/proses)
+    3. Cetak Slip Gaji (/gaji/<pid>/slip/cetak)
+    """
+    import json
+    import urllib.request
+    import urllib.error
+    import ssl
+    from datetime import date
+
+    close_after = False
+    if conn is None:
+        conn = get_db_connection()
+        close_after = True
+
+    try:
+        query = """
+            SELECT p.*, k.no_karyawan, k.nama AS nama_karyawan, k.jabatan
+            FROM payroll p
+            JOIN karyawan k ON k.id = p.karyawan_id
+            WHERE p.id = ?
+        """
+        row = conn.execute(query, (payroll_id,)).fetchone()
+        if not row:
+            return {'success': False, 'message': f'Payroll ID {payroll_id} tidak ditemukan.'}
+
+        webhook_url = os.environ.get('SICARE_WEBHOOK_URL', 'https://karir.faishalnafi.com/api/v1/webhook/payroll-payment')
+        api_key = get_or_create_external_api_key(conn)
+
+        payload = {
+            'event': 'payroll.payment_pushed',
+            'payroll_id': row['id'],
+            'no_karyawan': row['no_karyawan'] or '',
+            'karyawan_nama': row['nama_karyawan'] or '',
+            'periode_bulan': row['periode_bulan'],
+            'periode_tahun': row['periode_tahun'],
+            'gaji_pokok': float(row['gaji_pokok'] or 0),
+            'tunjangan': float(row['tunjangan'] or 0),
+            'uang_transport': float(row['uang_transport'] or 0),
+            'uang_makan': float(row['uang_makan'] or 0),
+            'bonus': float(row['bonus'] or 0),
+            'lain_lain': float(row['lain_lain'] or 0),
+            'bpjs_ketenagakerjaan': float(row['bpjs_tk_kar'] or 0),
+            'bpjs_kesehatan': float(row['bpjs_kes_kar'] or 0),
+            'pph21': float(row['pph21'] or 0),
+            'take_home_pay': float(row['gaji_bersih'] or 0),
+            'status_bayar': row['status_bayar'] or 'SUDAH_DIBAYAR',
+            'tanggal_bayar': row['tanggal_bayar'] or date.today().isoformat(),
+            'catatan': row['catatan'] or ''
+        }
+
+        data = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(
+            webhook_url,
+            data=data,
+            headers={
+                'Content-Type': 'application/json',
+                'X-API-KEY': api_key,
+                'User-Agent': 'FinanceERP-Payroll-Webhook/1.0'
+            },
+            method='POST'
+        )
+
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+
+        try:
+            with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
+                resp_body = resp.read().decode('utf-8')
+                result = json.loads(resp_body) if resp_body else {}
+                return {'success': True, 'response': result}
+        except urllib.error.HTTPError as http_err:
+            err_body = http_err.read().decode('utf-8', errors='ignore')
+            return {'success': False, 'status_code': http_err.code, 'error': err_body}
+        except Exception as net_err:
+            return {'success': False, 'error': str(net_err)}
+
+    finally:
+        if close_after:
+            conn.close()
